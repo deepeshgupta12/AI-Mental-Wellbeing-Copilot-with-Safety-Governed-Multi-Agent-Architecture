@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from mental_wellbeing_api.api.deps import db_session_dep
+from mental_wellbeing_api.models.check_in import CheckIn
+from mental_wellbeing_api.schemas.check_in import CheckInCreateRequest, CheckInResponse
+
+router = APIRouter(prefix="/check-ins", tags=["check-ins"])
+
+
+@router.post("", response_model=CheckInResponse)
+async def create_check_in(
+    payload: CheckInCreateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> CheckInResponse:
+    item = CheckIn(**payload.model_dump())
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+    return item
+
+
+@router.get("", response_model=list[CheckInResponse])
+async def list_check_ins(
+    user_id: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[CheckInResponse]:
+    result = await session.scalars(
+        select(CheckIn)
+        .where(CheckIn.user_id == user_id)
+        .order_by(desc(CheckIn.created_at))
+    )
+    return list(result.all())
