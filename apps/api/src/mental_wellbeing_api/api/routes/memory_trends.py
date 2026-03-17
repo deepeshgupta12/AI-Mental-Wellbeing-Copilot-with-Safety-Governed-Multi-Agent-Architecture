@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +38,13 @@ def _as_float(value: object) -> float | None:
 
 @router.get("/memory-summary", response_model=MemorySummaryResponse)
 async def get_memory_summary(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> MemorySummaryResponse:
     user = await session.scalar(
         select(User)
         .options(selectinload(User.profile))
-        .where(User.id == user_id)
+        .where(User.id == str(user_id))
     )
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -51,7 +53,7 @@ async def get_memory_summary(
         (
             await session.scalars(
                 select(CheckIn)
-                .where(CheckIn.user_id == user_id)
+                .where(CheckIn.user_id == str(user_id))
                 .order_by(CheckIn.created_at.desc())
                 .limit(3)
             )
@@ -62,7 +64,7 @@ async def get_memory_summary(
         (
             await session.scalars(
                 select(JournalEntry)
-                .where(JournalEntry.user_id == user_id)
+                .where(JournalEntry.user_id == str(user_id))
                 .order_by(JournalEntry.created_at.desc())
                 .limit(3)
             )
@@ -73,7 +75,7 @@ async def get_memory_summary(
         (
             await session.scalars(
                 select(ConversationSession)
-                .where(ConversationSession.user_id == user_id)
+                .where(ConversationSession.user_id == str(user_id))
                 .order_by(ConversationSession.updated_at.desc())
                 .limit(3)
             )
@@ -140,10 +142,10 @@ async def get_memory_summary(
 
 @router.get("/trend-summary", response_model=TrendSummaryResponse)
 async def get_trend_summary(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> TrendSummaryResponse:
-    user_exists = await session.scalar(select(User.id).where(User.id == user_id))
+    user_exists = await session.scalar(select(User.id).where(User.id == str(user_id)))
     if not user_exists:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -156,7 +158,7 @@ async def get_trend_summary(
                 func.avg(CheckIn.energy_score),
                 func.avg(CheckIn.sleep_hours),
                 func.max(CheckIn.created_at),
-            ).where(CheckIn.user_id == user_id)
+            ).where(CheckIn.user_id == str(user_id))
         )
     ).one()
 
@@ -165,7 +167,7 @@ async def get_trend_summary(
             select(
                 func.count(JournalEntry.id),
                 func.max(JournalEntry.created_at),
-            ).where(JournalEntry.user_id == user_id)
+            ).where(JournalEntry.user_id == str(user_id))
         )
     ).one()
 
@@ -174,7 +176,7 @@ async def get_trend_summary(
             select(
                 func.count(ConversationSession.id),
                 func.max(ConversationSession.updated_at),
-            ).where(ConversationSession.user_id == user_id)
+            ).where(ConversationSession.user_id == str(user_id))
         )
     ).one()
 
@@ -186,12 +188,12 @@ async def get_trend_summary(
                 ConversationSession,
                 ConversationMessage.session_id == ConversationSession.id,
             )
-            .where(ConversationSession.user_id == user_id)
+            .where(ConversationSession.user_id == str(user_id))
         )
     ).one()
 
     return TrendSummaryResponse(
-        user_id=user_id,
+        user_id=str(user_id),
         total_check_ins=int(check_in_stats[0] or 0),
         avg_mood_score=_as_float(check_in_stats[1]),
         avg_stress_score=_as_float(check_in_stats[2]),

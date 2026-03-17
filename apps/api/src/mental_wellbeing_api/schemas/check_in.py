@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class CheckInCreateRequest(BaseModel):
-    user_id: str
+    user_id: UUID
     mood_score: int | None = None
     stress_score: int | None = None
     energy_score: int | None = None

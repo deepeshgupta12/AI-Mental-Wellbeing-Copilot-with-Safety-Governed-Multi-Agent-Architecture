@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, EmailStr
 
@@ -37,3 +38,7 @@ class UserResponse(BaseModel):
     profile: UserProfileResponse | None = None
 
     model_config = {"from_attributes": True}
+
+
+class UserLookupParams(BaseModel):
+    user_id: UUID

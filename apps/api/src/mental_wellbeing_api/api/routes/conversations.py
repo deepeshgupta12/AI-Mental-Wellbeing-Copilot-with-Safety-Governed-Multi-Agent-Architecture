@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,7 @@ async def create_conversation_session(
     payload: ConversationSessionCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> ConversationSessionResponse:
-    item = ConversationSession(**payload.model_dump())
+    item = ConversationSession(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -30,12 +32,12 @@ async def create_conversation_session(
 
 @router.get("/sessions", response_model=list[ConversationSessionResponse])
 async def list_conversation_sessions(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[ConversationSessionResponse]:
     result = await session.scalars(
         select(ConversationSession)
-        .where(ConversationSession.user_id == user_id)
+        .where(ConversationSession.user_id == str(user_id))
         .order_by(desc(ConversationSession.updated_at))
     )
     return list(result.all())
@@ -46,7 +48,7 @@ async def create_conversation_message(
     payload: ConversationMessageCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> ConversationMessageResponse:
-    item = ConversationMessage(**payload.model_dump())
+    item = ConversationMessage(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -55,12 +57,12 @@ async def create_conversation_message(
 
 @router.get("/messages", response_model=list[ConversationMessageResponse])
 async def list_conversation_messages(
-    session_id: str,
+    session_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[ConversationMessageResponse]:
     result = await session.scalars(
         select(ConversationMessage)
-        .where(ConversationMessage.session_id == session_id)
+        .where(ConversationMessage.session_id == str(session_id))
         .order_by(ConversationMessage.created_at.asc())
     )
     return list(result.all())

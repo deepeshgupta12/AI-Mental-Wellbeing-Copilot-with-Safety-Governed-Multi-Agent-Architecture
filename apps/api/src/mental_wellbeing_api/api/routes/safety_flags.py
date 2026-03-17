@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,12 +15,12 @@ router = APIRouter(prefix="/safety-flags", tags=["safety-flags"])
 
 @router.get("", response_model=list[SafetyFlagResponse])
 async def list_safety_flags(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[SafetyFlagResponse]:
     result = await session.scalars(
         select(SafetyFlag)
-        .where(SafetyFlag.user_id == user_id)
+        .where(SafetyFlag.user_id == str(user_id))
         .order_by(desc(SafetyFlag.created_at))
     )
     return list(result.all())

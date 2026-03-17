@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class ActionPlanCreateRequest(BaseModel):
-    user_id: str
+    user_id: UUID
     title: str
     description: str | None = None
     timeframe: str | None = None
