@@ -1,0 +1,36 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+dist/
+coverage/
+.playwright/
+apps/web/node_modules/
+apps/web/dist/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+apps/api/.venv/
+
+# Env
+.env
+.env.local
+.env.*.local
+apps/api/.env
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS / misc
+Thumbs.db
