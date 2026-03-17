@@ -1,2 +1,8 @@
+#!/usr/bin/env bash
 set -euo pipefail
-echo "Dev up script placeholder"
+
+echo "Starting local infrastructure..."
+docker compose up -d postgres redis
+
+echo "Local infrastructure is up."
+docker compose ps
