@@ -34,3 +34,6 @@ apps/api/.env
 
 # OS / misc
 Thumbs.db
+
+*.egg-info/
+apps/api/src/*.egg-info/
