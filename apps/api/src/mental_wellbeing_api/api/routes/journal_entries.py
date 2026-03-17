@@ -13,6 +13,7 @@ from mental_wellbeing_api.schemas.journal_entry import (
     JournalEntryCreateRequest,
     JournalEntryResponse,
 )
+from mental_wellbeing_api.services.memory_service import MemoryService
 
 router = APIRouter(prefix="/journal-entries", tags=["journal-entries"])
 
@@ -27,6 +28,14 @@ async def create_journal_entry(
     item = JournalEntry(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
+    await session.refresh(item)
+
+    await MemoryService(session).add_memory(
+        user_id=item.user_id,
+        source_type="journal_entry",
+        source_id=item.id,
+        content=item.content,
+    )
     await session.refresh(item)
     return item
 

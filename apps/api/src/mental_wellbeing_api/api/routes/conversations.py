@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep
-from mental_wellbeing_api.api.utils import (
-    ensure_conversation_session_exists,
-    ensure_user_exists,
-)
+from mental_wellbeing_api.api.utils import ensure_user_exists
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.schemas.conversation import (
     ConversationMessageCreateRequest,
@@ -18,6 +15,7 @@ from mental_wellbeing_api.schemas.conversation import (
     ConversationSessionCreateRequest,
     ConversationSessionResponse,
 )
+from mental_wellbeing_api.services.memory_service import MemoryService
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -56,12 +54,28 @@ async def create_conversation_message(
     payload: ConversationMessageCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> ConversationMessageResponse:
-    await ensure_conversation_session_exists(session, str(payload.session_id))
+    conversation_session = await session.scalar(
+        select(ConversationSession).where(
+            ConversationSession.id == str(payload.session_id)
+        )
+    )
+    if not conversation_session:
+        raise HTTPException(status_code=404, detail="Conversation session not found")
 
     item = ConversationMessage(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
+
+    if item.role == "user":
+        await MemoryService(session).add_memory(
+            user_id=conversation_session.user_id,
+            source_type="conversation_message",
+            source_id=item.id,
+            content=item.content,
+        )
+        await session.refresh(item)
+
     return item
 
 
@@ -70,8 +84,6 @@ async def list_conversation_messages(
     session_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[ConversationMessageResponse]:
-    await ensure_conversation_session_exists(session, str(session_id))
-
     result = await session.scalars(
         select(ConversationMessage)
         .where(ConversationMessage.session_id == str(session_id))

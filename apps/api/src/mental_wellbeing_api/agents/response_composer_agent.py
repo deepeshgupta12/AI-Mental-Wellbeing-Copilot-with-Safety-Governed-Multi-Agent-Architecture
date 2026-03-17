@@ -23,15 +23,17 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     system_prompt = load_prompt(
         "agents/response_composer.txt",
         """
-        Compose a final user-facing response from the upstream agent outputs.
-        Keep it concise, calm, and supportive.
-        """,
+Compose a final user-facing response from the upstream agent outputs.
+Keep it concise, calm, and supportive.
+""",
     )
 
     user_prompt = (
         f"User input:\n{state['user_input']}\n\n"
+        f"Session context:\n{state.get('session_context', '')}\n\n"
         f"Structured summary:\n{state.get('structured_input', '')}\n\n"
-        f"Reflective response draft:\n{state.get('reflective_response', '')}\n\n"
+        f"Support strategy:\n{state.get('support_strategy', 'reflective')}\n\n"
+        f"Draft response:\n{state.get('reflective_response', '')}\n\n"
         "Compose the final response."
     )
     final_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
