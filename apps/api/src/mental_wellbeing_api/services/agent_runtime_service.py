@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
+from mental_wellbeing_api.models.user import User
 from mental_wellbeing_api.orchestration.graph import build_agent_runtime_graph
 from mental_wellbeing_api.schemas.agent_runtime import (
     AgentRuntimeSmokeRequest,
@@ -41,20 +43,20 @@ class AgentRuntimeService:
             }
         )
 
-        if (
-            payload.user_id is not None
-            and safety_eval.safety_override
-            and safety_eval.safety_flag_type
-        ):
-            flag = SafetyFlag(
-                user_id=str(payload.user_id),
-                severity=safety_eval.risk_level,
-                flag_type=safety_eval.safety_flag_type,
-                summary=safety_eval.safety_summary,
-                needs_review=True,
+        if payload.user_id is not None and safety_eval.safety_override and safety_eval.safety_flag_type:
+            user_exists = await self.session.scalar(
+                select(User.id).where(User.id == str(payload.user_id))
             )
-            self.session.add(flag)
-            await self.session.commit()
+            if user_exists:
+                flag = SafetyFlag(
+                    user_id=str(payload.user_id),
+                    severity=safety_eval.risk_level,
+                    flag_type=safety_eval.safety_flag_type,
+                    summary=safety_eval.safety_summary,
+                    needs_review=True,
+                )
+                self.session.add(flag)
+                await self.session.commit()
 
         return AgentRuntimeSmokeResponse(
             status="ok",

@@ -8,6 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep
+from mental_wellbeing_api.api.utils import ensure_user_exists
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
 from mental_wellbeing_api.schemas.safety_flag import (
     SafetyDashboardCountsResponse,
@@ -25,6 +26,8 @@ async def create_safety_flag(
     payload: SafetyFlagCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> SafetyFlagResponse:
+    await ensure_user_exists(session, str(payload.user_id))
+
     item = SafetyFlag(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
@@ -37,6 +40,8 @@ async def list_safety_flags(
     user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[SafetyFlagResponse]:
+    await ensure_user_exists(session, str(user_id))
+
     result = await session.scalars(
         select(SafetyFlag)
         .where(SafetyFlag.user_id == str(user_id))
@@ -61,12 +66,7 @@ async def get_safety_queue(
 async def get_safety_dashboard_counts(
     session: AsyncSession = Depends(db_session_dep),
 ) -> SafetyDashboardCountsResponse:
-    total_flags = int(
-        (
-            await session.scalar(select(func.count(SafetyFlag.id)))
-        )
-        or 0
-    )
+    total_flags = int((await session.scalar(select(func.count(SafetyFlag.id)))) or 0)
 
     open_flags = int(
         (
@@ -122,9 +122,7 @@ async def update_safety_flag(
     payload: SafetyFlagUpdateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> SafetyFlagResponse:
-    item = await session.scalar(
-        select(SafetyFlag).where(SafetyFlag.id == str(flag_id))
-    )
+    item = await session.scalar(select(SafetyFlag).where(SafetyFlag.id == str(flag_id)))
     if not item:
         raise HTTPException(status_code=404, detail="Safety flag not found")
 

@@ -1,6 +1,8 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from mental_wellbeing_api.api.router import api_router
 from mental_wellbeing_api.core.config import get_settings
@@ -27,6 +29,36 @@ def create_app() -> FastAPI:
         debug=settings.app_debug,
         lifespan=lifespan,
     )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "detail": exc.detail,
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        _: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "detail": "Validation failed",
+                "errors": exc.errors(),
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(_: Request, __: Exception) -> JSONResponse:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": "Internal server error",
+            },
+        )
 
     @app.get("/", tags=["meta"])
     async def root() -> dict[str, str]:

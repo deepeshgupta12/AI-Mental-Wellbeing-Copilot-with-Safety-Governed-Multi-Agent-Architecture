@@ -77,6 +77,11 @@ export async function apiRequest<T>(
     }
 
     return (await response.json()) as T;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out while calling the API.");
+    }
+    throw error;
   } finally {
     window.clearTimeout(timeoutId);
   }
