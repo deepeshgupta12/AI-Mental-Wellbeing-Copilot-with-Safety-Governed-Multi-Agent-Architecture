@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 from mental_wellbeing_api.main import app
 
 
 def test_core_user_flows() -> None:
+    unique_email = f"alex-{uuid4()}@example.com"
+
     with TestClient(app) as client:
         create_user_response = client.post(
             "/api/v1/users",
             json={
-                "email": "alex@example.com",
+                "email": unique_email,
                 "display_name": "Alex",
                 "timezone": "Asia/Kolkata",
                 "support_style": "calm",
@@ -87,18 +91,24 @@ def test_core_user_flows() -> None:
         assert list_journal_response.status_code == 200
         assert len(list_journal_response.json()) == 1
 
-        list_sessions_response = client.get(f"/api/v1/conversations/sessions?user_id={user_id}")
+        list_sessions_response = client.get(
+            f"/api/v1/conversations/sessions?user_id={user_id}"
+        )
         assert list_sessions_response.status_code == 200
         assert len(list_sessions_response.json()) == 1
 
-        list_messages_response = client.get(f"/api/v1/conversations/messages?session_id={session_id}")
+        list_messages_response = client.get(
+            f"/api/v1/conversations/messages?session_id={session_id}"
+        )
         assert list_messages_response.status_code == 200
         assert len(list_messages_response.json()) == 1
 
-        list_action_plans_response = client.get(f"/api/v1/action-plans?user_id={user_id}")
+        list_action_plans_response = client.get(
+            f"/api/v1/action-plans?user_id={user_id}"
+        )
         assert list_action_plans_response.status_code == 200
         assert len(list_action_plans_response.json()) == 1
 
         get_user_response = client.get(f"/api/v1/users/{user_id}")
         assert get_user_response.status_code == 200
-        assert get_user_response.json()["email"] == "alex@example.com"
+        assert get_user_response.json()["email"] == unique_email
