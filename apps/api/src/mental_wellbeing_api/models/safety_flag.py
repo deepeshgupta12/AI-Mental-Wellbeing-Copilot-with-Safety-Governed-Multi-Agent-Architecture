@@ -24,6 +24,10 @@ class SafetyFlag(Base):
     flag_type: Mapped[str] = mapped_column(String(100), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     needs_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), index=True
     )

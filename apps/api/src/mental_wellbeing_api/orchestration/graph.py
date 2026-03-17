@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
-from mental_wellbeing_api.agents.safety_triage_agent import run_safety_triage_agent
 
 from mental_wellbeing_api.agents.input_structuring_agent import run_input_structuring_agent
 from mental_wellbeing_api.agents.reflective_agent import run_reflective_agent
 from mental_wellbeing_api.agents.response_composer_agent import run_response_composer_agent
+from mental_wellbeing_api.agents.safety_triage_agent import run_safety_triage_agent
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 
 
