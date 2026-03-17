@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import ORJSONResponse
 
 from mental_wellbeing_api.api.router import api_router
 from mental_wellbeing_api.core.config import get_settings
@@ -26,7 +25,6 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         debug=settings.app_debug,
-        default_response_class=ORJSONResponse,
         lifespan=lifespan,
     )
 
