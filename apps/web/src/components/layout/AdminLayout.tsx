@@ -33,8 +33,12 @@ export function AdminLayout() {
               <span className="text-background font-heading font-bold text-sm">A</span>
             </div>
             <div>
-              <span className="font-heading font-semibold text-foreground text-base block leading-tight">Aether</span>
-              <span className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Operations</span>
+              <span className="font-heading font-semibold text-foreground text-base block leading-tight">
+                Aether
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">
+                Operations
+              </span>
             </div>
           </Link>
         </div>

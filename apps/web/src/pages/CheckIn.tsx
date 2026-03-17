@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, Sun, Moon, Zap, Battery } from "lucide-react";
+import { createCheckIn } from "@/lib/check-ins-api";
+import { getCurrentUserId } from "@/lib/demo-session";
+import { getApiErrorMessage } from "@/lib/api-client";
 
 const sliderLabels: Record<string, { icon: React.ElementType; low: string; high: string }> = {
   mood: { icon: Sun, low: "Low", high: "High" },
@@ -14,6 +18,8 @@ const sliderLabels: Record<string, { icon: React.ElementType; low: string; high:
 
 export default function CheckInPage() {
   const navigate = useNavigate();
+  const userId = getCurrentUserId();
+
   const [values, setValues] = useState<Record<string, number>>({
     mood: 5,
     stress: 3,
@@ -23,23 +29,41 @@ export default function CheckInPage() {
   const [context, setContext] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
+  const createCheckInMutation = useMutation({
+    mutationFn: createCheckIn,
+    onSuccess: () => setSubmitted(true),
+  });
+
   const handleChange = (key: string, val: number) => {
     setValues({ ...values, [key]: val });
   };
 
-  const handleSubmit = () => setSubmitted(true);
+  const handleSubmit = () => {
+    if (!userId) return;
+
+    createCheckInMutation.mutate({
+      user_id: userId,
+      mood_score: values.mood,
+      stress_score: values.stress,
+      energy_score: values.energy,
+      sleep_hours: values.sleep,
+      notes: context || null,
+    });
+  };
 
   if (submitted) {
     return (
       <div className="max-w-lg mx-auto px-4 md:px-8 py-12 md:py-20">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <h1 className="font-heading text-2xl font-bold text-foreground mb-2">Check-in complete.</h1>
-          <p className="text-muted-foreground text-sm mb-6">Here's your daily focus based on today's pulse.</p>
+          <p className="text-muted-foreground text-sm mb-6">
+            Your latest pulse has been saved successfully.
+          </p>
 
           <div className="p-6 rounded-lg border border-border bg-card shadow-card mb-6">
-            <h2 className="font-heading font-semibold text-foreground text-sm mb-2">Daily Focus: Micro-Rest</h2>
+            <h2 className="font-heading font-semibold text-foreground text-sm mb-2">Saved Snapshot</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your stress is elevated and energy is lower than usual. Today, prioritize short recovery moments rather than pushing through.
+              Mood {values.mood}/10 · Stress {values.stress}/10 · Sleep {values.sleep}h · Energy {values.energy}/10
             </p>
           </div>
 
@@ -61,6 +85,12 @@ export default function CheckInPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2">Daily Check-in</h1>
         <p className="text-muted-foreground text-sm mb-8">A quick pulse. No pressure, just awareness.</p>
+
+        {!userId && (
+          <div className="mb-6 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+            No active user session found. Please complete onboarding first.
+          </div>
+        )}
 
         <div className="space-y-6 mb-8">
           {Object.entries(sliderLabels).map(([key, meta]) => (
@@ -100,8 +130,21 @@ export default function CheckInPage() {
           />
         </div>
 
-        <Button onClick={handleSubmit} variant="hero" size="lg" className="w-full">
-          Complete check-in <ArrowRight className="w-4 h-4 ml-1" />
+        {createCheckInMutation.isError && (
+          <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+            {getApiErrorMessage(createCheckInMutation.error)}
+          </div>
+        )}
+
+        <Button
+          onClick={handleSubmit}
+          variant="hero"
+          size="lg"
+          className="w-full"
+          disabled={!userId || createCheckInMutation.isPending}
+        >
+          {createCheckInMutation.isPending ? "Saving check-in..." : "Complete check-in"}
+          <ArrowRight className="w-4 h-4 ml-1" />
         </Button>
       </motion.div>
     </div>

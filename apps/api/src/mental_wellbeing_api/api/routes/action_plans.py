@@ -7,6 +7,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep
+from mental_wellbeing_api.api.utils import ensure_user_exists
 from mental_wellbeing_api.models.action_plan import ActionPlan
 from mental_wellbeing_api.schemas.action_plan import ActionPlanCreateRequest, ActionPlanResponse
 
@@ -18,6 +19,8 @@ async def create_action_plan(
     payload: ActionPlanCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> ActionPlanResponse:
+    await ensure_user_exists(session, str(payload.user_id))
+
     item = ActionPlan(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
@@ -30,6 +33,8 @@ async def list_action_plans(
     user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[ActionPlanResponse]:
+    await ensure_user_exists(session, str(user_id))
+
     result = await session.scalars(
         select(ActionPlan)
         .where(ActionPlan.user_id == str(user_id))

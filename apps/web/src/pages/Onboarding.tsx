@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Flame, Brain, Moon, Heart, Cloud, Zap, MessageCircle, ListChecks, Feather } from "lucide-react";
+import { ArrowRight, Flame, Brain, Moon, Heart, Cloud, Zap, ListChecks, Feather } from "lucide-react";
+import { createUser } from "@/lib/users-api";
+import { setCurrentUserSession } from "@/lib/demo-session";
+import { getApiErrorMessage } from "@/lib/api-client";
 
 const steps = [
   {
@@ -46,7 +50,30 @@ const steps = [
     subtitle: "",
     isBoundary: true,
   },
-];
+] as const;
+
+function buildEmailFromSelections(selections: Record<string, string | string[]>) {
+  const style = typeof selections.style === "string" ? selections.style : "reflective";
+  const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
+  const suffix = `${Date.now()}`;
+  return `${intent}-${style}-${suffix}@aether.local`;
+}
+
+function buildDisplayName(selections: Record<string, string | string[]>) {
+  const intent = typeof selections.intent === "string" ? selections.intent : "Aether";
+  return `${intent.charAt(0).toUpperCase()}${intent.slice(1)} User`;
+}
+
+function buildGoals(selections: Record<string, string | string[]>) {
+  const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
+  const goalsMap: Record<string, string> = {
+    burnout: "Recover energy and reduce burnout.",
+    clarity: "Gain emotional clarity and reflect better.",
+    habits: "Build more stable wellbeing routines.",
+    prevention: "Stay safer and respond earlier to distress signals.",
+  };
+  return goalsMap[intent] ?? "Improve overall wellbeing and self-awareness.";
+}
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
@@ -55,8 +82,20 @@ export default function OnboardingPage() {
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
 
+  const createUserMutation = useMutation({
+    mutationFn: createUser,
+    onSuccess: (user) => {
+      setCurrentUserSession({
+        userId: user.id,
+        email: user.email,
+        displayName: user.profile?.display_name ?? "Aether User",
+      });
+      navigate("/app");
+    },
+  });
+
   const handleSelect = (optionId: string) => {
-    if (step.multiSelect) {
+    if ("multiSelect" in step && step.multiSelect) {
       const current = (selections[step.id] as string[]) || [];
       const updated = current.includes(optionId)
         ? current.filter((id) => id !== optionId)
@@ -67,19 +106,39 @@ export default function OnboardingPage() {
     }
   };
 
-  const canProceed = step.isBoundary || (selections[step.id] && (Array.isArray(selections[step.id]) ? (selections[step.id] as string[]).length > 0 : true));
+  const canProceed =
+    "isBoundary" in step && step.isBoundary
+      ? true
+      : !!(
+          selections[step.id] &&
+          (Array.isArray(selections[step.id])
+            ? (selections[step.id] as string[]).length > 0
+            : true)
+        );
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
-    } else {
-      navigate("/app");
+      return;
     }
+
+    const payload = {
+      email: buildEmailFromSelections(selections),
+      display_name: buildDisplayName(selections),
+      timezone: "Asia/Kolkata",
+      support_style:
+        typeof selections.style === "string" ? selections.style : "reflective",
+      wellbeing_goals: buildGoals(selections),
+      focus_areas: Array.isArray(selections.focus)
+        ? selections.focus.join(",")
+        : "",
+    };
+
+    createUserMutation.mutate(payload);
   };
 
   return (
     <div className="min-h-svh bg-background flex flex-col">
-      {/* Progress line */}
       <div className="h-0.5 bg-border">
         <motion.div
           className="h-full bg-primary"
@@ -105,11 +164,12 @@ export default function OnboardingPage() {
               >
                 {step.title}
               </h1>
+
               {step.subtitle && (
                 <p className="text-muted-foreground text-sm mb-8">{step.subtitle}</p>
               )}
 
-              {step.isBoundary ? (
+              {"isBoundary" in step && step.isBoundary ? (
                 <div className="space-y-5 mb-8">
                   <div className="p-5 rounded-lg border border-border bg-card shadow-card">
                     <p className="text-sm text-foreground leading-relaxed mb-3">
@@ -124,11 +184,17 @@ export default function OnboardingPage() {
                   </div>
                 </div>
               ) : (
-                <div className={`grid gap-3 mb-8 ${step.options && step.options.length > 3 ? "grid-cols-2" : "grid-cols-1"}`}>
+                <div
+                  className={`grid gap-3 mb-8 ${
+                    step.options && step.options.length > 3 ? "grid-cols-2" : "grid-cols-1"
+                  }`}
+                >
                   {step.options?.map((opt) => {
-                    const isSelected = step.multiSelect
-                      ? ((selections[step.id] as string[]) || []).includes(opt.id)
-                      : selections[step.id] === opt.id;
+                    const isSelected =
+                      "multiSelect" in step && step.multiSelect
+                        ? ((selections[step.id] as string[]) || []).includes(opt.id)
+                        : selections[step.id] === opt.id;
+
                     return (
                       <button
                         key={opt.id}
@@ -141,15 +207,19 @@ export default function OnboardingPage() {
                       >
                         <div className="flex items-center gap-3">
                           <opt.icon
-                            className={`w-5 h-5 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`}
+                            className={`w-5 h-5 shrink-0 ${
+                              isSelected ? "text-primary" : "text-muted-foreground"
+                            }`}
                             strokeWidth={1.5}
                           />
                           <div>
-                            <span className={`text-sm font-medium ${isSelected ? "text-foreground" : "text-foreground"}`}>
+                            <span className="text-sm font-medium text-foreground">
                               {opt.label}
                             </span>
                             {"desc" in opt && opt.desc && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {opt.desc}
+                              </p>
                             )}
                           </div>
                         </div>
@@ -159,14 +229,26 @@ export default function OnboardingPage() {
                 </div>
               )}
 
+              {createUserMutation.isError && (
+                <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                  {getApiErrorMessage(createUserMutation.error)}
+                </div>
+              )}
+
               <Button
                 onClick={handleNext}
                 variant="hero"
                 size="lg"
-                disabled={!canProceed}
+                disabled={!canProceed || createUserMutation.isPending}
                 className="w-full"
               >
-                {step.isBoundary ? "I understand" : currentStep === steps.length - 1 ? "Begin" : "Continue"}
+                {createUserMutation.isPending
+                  ? "Creating your space..."
+                  : "isBoundary" in step && step.isBoundary
+                    ? "I understand"
+                    : currentStep === steps.length - 1
+                      ? "Begin"
+                      : "Continue"}
                 <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </motion.div>

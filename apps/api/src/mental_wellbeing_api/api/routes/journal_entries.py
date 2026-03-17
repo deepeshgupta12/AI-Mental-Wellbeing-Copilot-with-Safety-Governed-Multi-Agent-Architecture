@@ -7,6 +7,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep
+from mental_wellbeing_api.api.utils import ensure_user_exists
 from mental_wellbeing_api.models.journal_entry import JournalEntry
 from mental_wellbeing_api.schemas.journal_entry import (
     JournalEntryCreateRequest,
@@ -21,6 +22,8 @@ async def create_journal_entry(
     payload: JournalEntryCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> JournalEntryResponse:
+    await ensure_user_exists(session, str(payload.user_id))
+
     item = JournalEntry(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
@@ -33,6 +36,8 @@ async def list_journal_entries(
     user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[JournalEntryResponse]:
+    await ensure_user_exists(session, str(user_id))
+
     result = await session.scalars(
         select(JournalEntry)
         .where(JournalEntry.user_id == str(user_id))
