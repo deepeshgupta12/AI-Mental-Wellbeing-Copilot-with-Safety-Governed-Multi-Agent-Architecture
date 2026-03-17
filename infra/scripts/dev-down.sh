@@ -1,2 +1,5 @@
+#!/usr/bin/env bash
 set -euo pipefail
-echo "Dev down script placeholder"
+
+echo "Stopping local infrastructure..."
+docker compose down

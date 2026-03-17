@@ -2,23 +2,35 @@
 name = "mental-wellbeing-api"
 version = "0.1.0"
 description = "FastAPI backend for AI Mental Wellbeing Copilot"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.30.0",
   "pydantic>=2.8.0",
   "pydantic-settings>=2.4.0",
-  "sqlalchemy>=2.0.35",
-  "psycopg[binary]>=3.2.0",
-  "alembic>=1.13.0",
-  "redis>=5.0.0",
+  "sqlalchemy[asyncio]>=2.0.35",
+  "greenlet>=3.1.1",
+  "asyncpg>=0.29.0",
+  "alembic>=1.13.2",
+  "redis[hiredis]>=5.0.8",
   "httpx>=0.27.0",
-  "pgvector>=0.3.0",
-  "langgraph>=0.2.0",
+  "tenacity>=9.0.0",
+  "structlog>=24.4.0",
+  "orjson>=3.10.7",
+  "python-dotenv>=1.0.1",
+  "langgraph>=0.2.14",
   "langchain>=0.3.0",
-  "openai>=1.40.0",
-  "ollama>=0.4.0",
-  "python-dotenv>=1.0.1"
+  "openai>=1.43.0",
+  "ollama>=0.4.7"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.2",
+  "pytest-asyncio>=0.24.0",
+  "ruff>=0.6.4",
+  "mypy>=1.11.2"
 ]
 
 [build-system]
@@ -30,3 +42,20 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+warn_unused_ignores = true
+ignore_missing_imports = true
