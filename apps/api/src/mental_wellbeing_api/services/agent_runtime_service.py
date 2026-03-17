@@ -10,6 +10,7 @@ from mental_wellbeing_api.schemas.agent_runtime import (
     AgentRuntimeSmokeRequest,
     AgentRuntimeSmokeResponse,
 )
+from mental_wellbeing_api.services.memory_service import MemoryService
 from mental_wellbeing_api.services.safety_service import (
     SafetyEvaluationResponse,
     SafetyService,
@@ -21,6 +22,7 @@ class AgentRuntimeService:
         self.graph = build_agent_runtime_graph()
         self.session = session
         self.safety_service = SafetyService()
+        self.memory_service = MemoryService(session)
 
     async def evaluate_safety_only(
         self, payload: AgentRuntimeSmokeRequest
@@ -32,10 +34,24 @@ class AgentRuntimeService:
     ) -> AgentRuntimeSmokeResponse:
         safety_eval = self.safety_service.evaluate_text(payload.user_input)
 
+        recalled_memories: list[str] = []
+        if payload.user_id is not None:
+            user_exists = await self.session.scalar(
+                select(User.id).where(User.id == str(payload.user_id))
+            )
+            if user_exists:
+                recalled_memories = await self.memory_service.recall(
+                    user_id=str(payload.user_id),
+                    query=payload.user_input,
+                    limit=3,
+                )
+
         result = self.graph.invoke(
             {
+                "user_id": str(payload.user_id) if payload.user_id else "",
                 "user_input": payload.user_input,
                 "provider": payload.provider,
+                "recalled_memories": recalled_memories,
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
@@ -43,7 +59,11 @@ class AgentRuntimeService:
             }
         )
 
-        if payload.user_id is not None and safety_eval.safety_override and safety_eval.safety_flag_type:
+        if (
+            payload.user_id is not None
+            and safety_eval.safety_override
+            and safety_eval.safety_flag_type
+        ):
             user_exists = await self.session.scalar(
                 select(User.id).where(User.id == str(payload.user_id))
             )
