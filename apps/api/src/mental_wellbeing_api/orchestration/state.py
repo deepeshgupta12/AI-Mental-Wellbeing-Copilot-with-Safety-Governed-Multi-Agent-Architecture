@@ -9,3 +9,7 @@ class AgentRuntimeState(TypedDict, total=False):
     structured_input: str
     reflective_response: str
     final_response: str
+    risk_level: str
+    safety_flag_type: str
+    safety_summary: str
+    safety_override: bool

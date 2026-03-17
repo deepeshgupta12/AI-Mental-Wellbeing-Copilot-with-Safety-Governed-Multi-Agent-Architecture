@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
+
+
+class SafetyFlagCreateRequest(BaseModel):
+    user_id: UUID
+    severity: str
+    flag_type: str
+    summary: str | None = None
+    needs_review: bool = True
 
 
 class SafetyFlagResponse(BaseModel):

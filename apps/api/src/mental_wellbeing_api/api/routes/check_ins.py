@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +18,7 @@ async def create_check_in(
     payload: CheckInCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> CheckInResponse:
-    item = CheckIn(**payload.model_dump())
+    item = CheckIn(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -25,12 +27,12 @@ async def create_check_in(
 
 @router.get("", response_model=list[CheckInResponse])
 async def list_check_ins(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[CheckInResponse]:
     result = await session.scalars(
         select(CheckIn)
-        .where(CheckIn.user_id == user_id)
+        .where(CheckIn.user_id == str(user_id))
         .order_by(desc(CheckIn.created_at))
     )
     return list(result.all())

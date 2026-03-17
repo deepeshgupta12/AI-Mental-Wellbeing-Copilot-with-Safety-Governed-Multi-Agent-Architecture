@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class ConversationSessionCreateRequest(BaseModel):
-    user_id: str
+    user_id: UUID
     title: str | None = None
     status: str = "active"
 
@@ -23,7 +24,7 @@ class ConversationSessionResponse(BaseModel):
 
 
 class ConversationMessageCreateRequest(BaseModel):
-    session_id: str
+    session_id: UUID
     role: str
     content: str
     message_type: str = "text"

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
 class JournalEntryCreateRequest(BaseModel):
-    user_id: str
+    user_id: UUID
     title: str | None = None
     content: str
     entry_type: str | None = None

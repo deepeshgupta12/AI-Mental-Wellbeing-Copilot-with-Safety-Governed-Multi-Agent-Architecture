@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +18,7 @@ async def create_action_plan(
     payload: ActionPlanCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> ActionPlanResponse:
-    item = ActionPlan(**payload.model_dump())
+    item = ActionPlan(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -25,12 +27,12 @@ async def create_action_plan(
 
 @router.get("", response_model=list[ActionPlanResponse])
 async def list_action_plans(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[ActionPlanResponse]:
     result = await session.scalars(
         select(ActionPlan)
-        .where(ActionPlan.user_id == user_id)
+        .where(ActionPlan.user_id == str(user_id))
         .order_by(desc(ActionPlan.created_at))
     )
     return list(result.all())

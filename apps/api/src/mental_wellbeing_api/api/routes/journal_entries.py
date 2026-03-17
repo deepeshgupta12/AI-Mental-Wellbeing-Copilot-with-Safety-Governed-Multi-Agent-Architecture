@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +21,7 @@ async def create_journal_entry(
     payload: JournalEntryCreateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> JournalEntryResponse:
-    item = JournalEntry(**payload.model_dump())
+    item = JournalEntry(**payload.model_dump(mode="json"))
     session.add(item)
     await session.commit()
     await session.refresh(item)
@@ -28,12 +30,12 @@ async def create_journal_entry(
 
 @router.get("", response_model=list[JournalEntryResponse])
 async def list_journal_entries(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[JournalEntryResponse]:
     result = await session.scalars(
         select(JournalEntry)
-        .where(JournalEntry.user_id == user_id)
+        .where(JournalEntry.user_id == str(user_id))
         .order_by(desc(JournalEntry.created_at))
     )
     return list(result.all())

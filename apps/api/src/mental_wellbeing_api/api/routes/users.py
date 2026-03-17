@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,13 +45,13 @@ async def create_user(
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
-    user_id: str,
+    user_id: UUID,
     session: AsyncSession = Depends(db_session_dep),
 ) -> UserResponse:
     user = await session.scalar(
         select(User)
         .options(selectinload(User.profile))
-        .where(User.id == user_id)
+        .where(User.id == str(user_id))
     )
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
