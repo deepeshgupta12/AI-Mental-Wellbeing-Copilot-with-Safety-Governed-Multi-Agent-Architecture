@@ -31,9 +31,6 @@ class MemoryService:
         normalized_source = source_type.strip().lower()
         normalized_content = content.lower()
 
-        if normalized_source in {"check_in", "journal_entry", "conversation_message"}:
-            return "episodic"
-
         if normalized_source in {"user_preference", "preference", "support_preference"}:
             return "preference"
 
@@ -56,6 +53,9 @@ class MemoryService:
             ]
         ):
             return "helpful_strategy"
+
+        if normalized_source in {"check_in", "journal_entry", "conversation_message"}:
+            return "episodic"
 
         return "episodic"
 
@@ -97,6 +97,34 @@ class MemoryService:
         age_hours = max((datetime.now(timezone.utc) - created_at).total_seconds() / 3600, 0.0)
         return max(0.0, min(1.0, math.exp(-age_hours / 168)))
 
+    def _preference_alignment_score(
+        self,
+        content: str,
+        preference_signals: dict[str, str] | None = None,
+    ) -> float:
+        if not preference_signals:
+            return 0.0
+
+        lowered_content = content.lower()
+        score = 0.0
+
+        support_style = preference_signals.get("support_style", "").lower()
+        preferred_support_mode = preference_signals.get("preferred_support_mode", "").lower()
+        focus_areas = preference_signals.get("focus_areas", "").lower()
+
+        if support_style and support_style in lowered_content:
+            score += 0.2
+        if preferred_support_mode and preferred_support_mode in lowered_content:
+            score += 0.25
+
+        if focus_areas:
+            focus_tokens = [token.strip() for token in focus_areas.split(",") if token.strip()]
+            for token in focus_tokens[:4]:
+                if token in lowered_content:
+                    score += 0.1
+
+        return min(score, 0.35)
+
     async def add_memory(
         self,
         *,
@@ -137,6 +165,7 @@ class MemoryService:
         query: str,
         limit: int = 3,
         memory_kinds: list[str] | None = None,
+        preference_signals: dict[str, str] | None = None,
     ) -> list[MemoryRecallItem]:
         query_embedding = self.embeddings.embed_text(query)
 
@@ -158,12 +187,17 @@ class MemoryService:
                 overlap_score = self._text_overlap_score(query, memory_chunk.content)
                 recency_score = self._recency_score(memory_chunk.created_at)
                 importance = memory_chunk.importance_score or 0.0
+                preference_alignment = self._preference_alignment_score(
+                    memory_chunk.content,
+                    preference_signals,
+                )
 
                 blended_score = (
-                    (similarity * 0.45)
-                    + (overlap_score * 0.25)
-                    + (recency_score * 0.15)
-                    + (importance * 0.15)
+                    (similarity * 0.38)
+                    + (overlap_score * 0.22)
+                    + (recency_score * 0.14)
+                    + (importance * 0.14)
+                    + (preference_alignment * 0.12)
                 )
 
                 scored_items.append(
@@ -215,12 +249,14 @@ class MemoryService:
         query: str,
         limit: int = 3,
         memory_kinds: list[str] | None = None,
+        preference_signals: dict[str, str] | None = None,
     ) -> list[str]:
         recalled = await self.recall(
             user_id=user_id,
             query=query,
             limit=limit,
             memory_kinds=memory_kinds,
+            preference_signals=preference_signals,
         )
         return [item.content for item in recalled]
 

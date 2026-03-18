@@ -6,13 +6,33 @@ from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
 
 
+def _style_prefix(preference_signals: dict[str, str]) -> str:
+    support_style = preference_signals.get("support_style", "").lower()
+    preferred_support_mode = preference_signals.get("preferred_support_mode", "").lower()
+
+    if preferred_support_mode == "plan":
+        return "Let's make this concrete."
+    if preferred_support_mode == "recover":
+        return "Let's keep this calming and restorative."
+    if support_style == "direct":
+        return "I'll keep this practical and clear."
+    if support_style == "reflective":
+        return "I'll stay thoughtful and gentle with this."
+    return ""
+
+
 def _build_mock_final_response(state: AgentRuntimeState) -> str:
     specialist_response = state.get("specialist_response") or state.get("reflective_response", "")
     coping_recommendations = state.get("coping_recommendations", [])
     journaling_insights = state.get("journaling_insights", [])
     follow_up_suggestions = state.get("follow_up_suggestions", [])
+    preference_signals = state.get("preference_signals", {})
 
     parts: list[str] = []
+
+    prefix = _style_prefix(preference_signals)
+    if prefix:
+        parts.append(prefix)
 
     if specialist_response:
         parts.append(specialist_response)
@@ -83,6 +103,7 @@ Compose a final user-facing response from the upstream agent outputs.
 Keep it concise, calm, supportive, and clearly non-clinical.
 Prefer the specialist draft when present.
 Use coping recommendations and follow-up suggestions selectively instead of repeating everything.
+Adapt the tone to the user's support-style preferences when available.
 """,
     )
 
@@ -97,6 +118,7 @@ Use coping recommendations and follow-up suggestions selectively instead of repe
         f"Support mode:\n{state.get('support_mode', 'reflect')}\n\n"
         f"Support strategy:\n{state.get('support_strategy', 'reflective')}\n\n"
         f"Specialist agent:\n{state.get('specialist_agent', 'reflective_support')}\n\n"
+        f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
         f"Primary draft:\n{state.get('specialist_response', state.get('reflective_response', ''))}\n\n"
         f"Coping recommendations:\n{state.get('coping_recommendations', [])}\n\n"
         f"Journaling insights:\n{state.get('journaling_insights', [])}\n\n"

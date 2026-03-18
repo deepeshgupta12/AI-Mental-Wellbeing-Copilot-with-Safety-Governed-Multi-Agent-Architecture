@@ -23,6 +23,8 @@ class UserProfileResponse(BaseModel):
     support_style: str | None
     wellbeing_goals: str | None
     focus_areas: str | None
+    preferred_support_mode: str | None = None
+    preference_profile_json: dict | None = None
     created_at: datetime
     updated_at: datetime
 
