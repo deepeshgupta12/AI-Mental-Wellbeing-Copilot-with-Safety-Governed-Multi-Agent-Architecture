@@ -35,7 +35,12 @@ class Settings(BaseSettings):
     ollama_default_model: str = Field(default="llama3.2", alias="OLLAMA_DEFAULT_MODEL")
 
     cors_allow_origins: str = Field(
-        default="http://localhost:8080,http://127.0.0.1:8080",
+        default=(
+            "http://localhost:3000,"
+            "http://127.0.0.1:3000,"
+            "http://localhost:8080,"
+            "http://127.0.0.1:8080"
+        ),
         alias="CORS_ALLOW_ORIGINS",
     )
 
