@@ -3,43 +3,77 @@ const CURRENT_USER_EMAIL_KEY = "mwc_current_user_email";
 const CURRENT_USER_NAME_KEY = "mwc_current_user_name";
 const CURRENT_CONVERSATION_SESSION_ID_KEY = "mwc_current_conversation_session_id";
 
+function canUseStorage(): boolean {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+function safeGet(key: string): string | null {
+  if (!canUseStorage()) return null;
+
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSet(key: string, value: string): void {
+  if (!canUseStorage()) return;
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore storage failures in demo mode
+  }
+}
+
+function safeRemove(key: string): void {
+  if (!canUseStorage()) return;
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore storage failures in demo mode
+  }
+}
+
 export function setCurrentUserSession(params: {
   userId: string;
   email: string;
   displayName?: string | null;
 }) {
-  localStorage.setItem(CURRENT_USER_ID_KEY, params.userId);
-  localStorage.setItem(CURRENT_USER_EMAIL_KEY, params.email);
-  localStorage.setItem(CURRENT_USER_NAME_KEY, params.displayName ?? "");
+  safeSet(CURRENT_USER_ID_KEY, params.userId);
+  safeSet(CURRENT_USER_EMAIL_KEY, params.email);
+  safeSet(CURRENT_USER_NAME_KEY, params.displayName ?? "");
 }
 
 export function getCurrentUserId(): string | null {
-  return localStorage.getItem(CURRENT_USER_ID_KEY);
+  return safeGet(CURRENT_USER_ID_KEY);
 }
 
 export function getCurrentUserEmail(): string | null {
-  return localStorage.getItem(CURRENT_USER_EMAIL_KEY);
+  return safeGet(CURRENT_USER_EMAIL_KEY);
 }
 
 export function getCurrentUserDisplayName(): string | null {
-  return localStorage.getItem(CURRENT_USER_NAME_KEY);
+  return safeGet(CURRENT_USER_NAME_KEY);
 }
 
 export function clearCurrentUserSession() {
-  localStorage.removeItem(CURRENT_USER_ID_KEY);
-  localStorage.removeItem(CURRENT_USER_EMAIL_KEY);
-  localStorage.removeItem(CURRENT_USER_NAME_KEY);
-  localStorage.removeItem(CURRENT_CONVERSATION_SESSION_ID_KEY);
+  safeRemove(CURRENT_USER_ID_KEY);
+  safeRemove(CURRENT_USER_EMAIL_KEY);
+  safeRemove(CURRENT_USER_NAME_KEY);
+  safeRemove(CURRENT_CONVERSATION_SESSION_ID_KEY);
 }
 
 export function setCurrentConversationSessionId(sessionId: string) {
-  localStorage.setItem(CURRENT_CONVERSATION_SESSION_ID_KEY, sessionId);
+  safeSet(CURRENT_CONVERSATION_SESSION_ID_KEY, sessionId);
 }
 
 export function getCurrentConversationSessionId(): string | null {
-  return localStorage.getItem(CURRENT_CONVERSATION_SESSION_ID_KEY);
+  return safeGet(CURRENT_CONVERSATION_SESSION_ID_KEY);
 }
 
 export function clearCurrentConversationSessionId() {
-  localStorage.removeItem(CURRENT_CONVERSATION_SESSION_ID_KEY);
+  safeRemove(CURRENT_CONVERSATION_SESSION_ID_KEY);
 }

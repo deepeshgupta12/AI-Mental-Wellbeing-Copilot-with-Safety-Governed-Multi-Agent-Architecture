@@ -1,33 +1,35 @@
-import { Outlet, Link } from "react-router-dom";
-import { AppSidebar } from "./AppSidebar";
-import { MobileNav } from "./MobileNav";
+"use client";
+
+import Link from "next/link";
+import { ReactNode } from "react";
 import { ShieldAlert } from "lucide-react";
 
-export function AppLayout() {
+import { AppSidebar } from "./AppSidebar";
+import { MobileNav } from "./MobileNav";
+
+export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh w-full bg-background">
       <AppSidebar />
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden flex items-center justify-between h-14 px-4 border-b border-border bg-background/95 backdrop-blur-sm sticky top-0 z-40">
-          <Link to="/app" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-heading font-bold text-xs">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur-sm md:hidden">
+          <Link href="/app" className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
+              <span className="font-heading text-xs font-bold text-primary-foreground">
                 A
               </span>
             </div>
             <span className="font-heading font-semibold text-foreground">Aether</span>
           </Link>
           <Link
-            to="/app/safety"
-            className="p-2 text-urgent hover:bg-urgent/10 rounded-md transition-aether"
+            href="/app/safety"
+            className="rounded-md p-2 text-urgent transition-aether hover:bg-urgent/10"
           >
-            <ShieldAlert className="w-5 h-5" strokeWidth={1.5} />
+            <ShieldAlert className="h-5 w-5" strokeWidth={1.5} />
           </Link>
         </header>
 
-        <main className="flex-1 pb-20 md:pb-0">
-          <Outlet />
-        </main>
+        <main className="flex-1 pb-20 md:pb-0">{children}</main>
         <MobileNav />
       </div>
     </div>
