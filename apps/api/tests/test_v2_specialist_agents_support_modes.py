@@ -40,6 +40,9 @@ def test_sleep_recovery_specialist_path() -> None:
         assert payload["specialist_agent"] == "sleep_recovery"
         assert payload["support_mode"] == "recover"
         assert "sleep_recovery" in payload["execution_path"]
+        assert payload["specialist_response"]
+        assert len(payload["coping_recommendations"]) >= 1
+        assert len(payload["follow_up_suggestions"]) >= 1
 
 
 def test_social_support_specialist_path() -> None:
@@ -75,6 +78,9 @@ def test_social_support_specialist_path() -> None:
         assert payload["specialist_agent"] == "social_support"
         assert payload["support_mode"] == "connect"
         assert "social_support" in payload["execution_path"]
+        assert payload["specialist_response"]
+        assert len(payload["coping_recommendations"]) >= 1
+        assert len(payload["follow_up_suggestions"]) >= 1
 
 
 def test_cbt_reframing_specialist_path() -> None:
@@ -110,6 +116,9 @@ def test_cbt_reframing_specialist_path() -> None:
         assert payload["specialist_agent"] == "cbt_reframing"
         assert payload["support_mode"] == "reframe"
         assert "cbt_reframing" in payload["execution_path"]
+        assert payload["specialist_response"]
+        assert len(payload["coping_recommendations"]) >= 1
+        assert len(payload["journaling_insights"]) >= 1
 
 
 def test_journaling_insight_specialist_path() -> None:
@@ -145,6 +154,9 @@ def test_journaling_insight_specialist_path() -> None:
         assert payload["specialist_agent"] == "journaling_insight"
         assert payload["support_mode"] == "reflect"
         assert "journaling_insight" in payload["execution_path"]
+        assert payload["specialist_response"]
+        assert len(payload["journaling_insights"]) >= 1
+        assert len(payload["follow_up_suggestions"]) >= 1
 
 
 def test_habit_care_plan_specialist_path() -> None:
@@ -180,3 +192,6 @@ def test_habit_care_plan_specialist_path() -> None:
         assert payload["specialist_agent"] == "habit_care_plan"
         assert payload["support_mode"] == "plan"
         assert "habit_care_plan" in payload["execution_path"]
+        assert payload["specialist_response"]
+        assert len(payload["coping_recommendations"]) >= 1
+        assert len(payload["follow_up_suggestions"]) >= 1
