@@ -7,6 +7,7 @@ from uuid import uuid4
 import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from structlog.contextvars import bind_contextvars, clear_contextvars
 
@@ -36,6 +37,14 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.app_debug,
         lifespan=lifespan,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.middleware("http")

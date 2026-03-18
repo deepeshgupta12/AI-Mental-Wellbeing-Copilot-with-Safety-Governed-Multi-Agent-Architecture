@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
     ollama_default_model: str = Field(default="llama3.2", alias="OLLAMA_DEFAULT_MODEL")
 
+    cors_allow_origins: str = Field(
+        default="http://localhost:8080,http://127.0.0.1:8080",
+        alias="CORS_ALLOW_ORIGINS",
+    )
+
     @property
     def database_url(self) -> str:
         return (
@@ -44,6 +49,14 @@ class Settings(BaseSettings):
     @property
     def redis_url(self) -> str:
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
+
+    @property
+    def cors_allow_origins_list(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.cors_allow_origins.split(",")
+            if origin.strip()
+        ]
 
 
 @lru_cache
