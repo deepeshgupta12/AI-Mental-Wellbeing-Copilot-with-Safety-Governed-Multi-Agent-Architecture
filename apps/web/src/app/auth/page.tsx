@@ -1,25 +1,23 @@
+// apps/web/src/app/auth/page.tsx
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default function AuthPage() {
+function AuthPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const initialMode = useMemo(
-    () => (searchParams.get("mode") === "signup" ? "signup" : "signin"),
-    [searchParams],
+  const [mode, setMode] = useState<"signin" | "signup">(
+    searchParams.get("mode") === "signup" ? "signup" : "signin",
   );
-
-  const [mode, setMode] = useState<"signin" | "signup">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -37,14 +35,17 @@ export default function AuthPage() {
           </div>
           <span className="font-heading text-lg font-semibold text-foreground">Aether</span>
         </Link>
+
         <div className="max-w-sm">
           <h2 className="mb-4 font-heading text-3xl font-bold leading-tight text-foreground">
             Your wellbeing, supported with calm intelligence.
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Aether helps you reflect, cope, and build better habits — with safety and privacy at its core.
+            Aether helps you reflect, cope, and build better habits — with safety and privacy at
+            its core.
           </p>
         </div>
+
         <p className="text-xs text-muted-foreground">
           Not a replacement for therapy or emergency services.
         </p>
@@ -71,6 +72,7 @@ export default function AuthPage() {
               <h1 className="mb-2 font-heading text-2xl font-bold text-foreground">
                 {mode === "signin" ? "Welcome back" : "Begin your journey"}
               </h1>
+
               <p className="mb-8 text-sm text-muted-foreground">
                 {mode === "signin"
                   ? "Sign in to continue with Aether."
@@ -79,7 +81,9 @@ export default function AuthPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Email
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -89,8 +93,11 @@ export default function AuthPage() {
                     className="h-11"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </Label>
                   <Input
                     id="password"
                     type="password"
@@ -100,6 +107,7 @@ export default function AuthPage() {
                     className="h-11"
                   />
                 </div>
+
                 <Button type="submit" variant="hero" className="w-full" size="lg">
                   {mode === "signin" ? "Sign in" : "Create account"}
                 </Button>
@@ -110,6 +118,7 @@ export default function AuthPage() {
                   <>
                     New to Aether?{" "}
                     <button
+                      type="button"
                       onClick={() => setMode("signup")}
                       className="font-medium text-primary hover:underline"
                     >
@@ -120,6 +129,7 @@ export default function AuthPage() {
                   <>
                     Already have an account?{" "}
                     <button
+                      type="button"
                       onClick={() => setMode("signin")}
                       className="font-medium text-primary hover:underline"
                     >
@@ -133,5 +143,19 @@ export default function AuthPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-svh items-center justify-center bg-background text-sm text-muted-foreground">
+          Loading...
+        </div>
+      }
+    >
+      <AuthPageInner />
+    </Suspense>
   );
 }
