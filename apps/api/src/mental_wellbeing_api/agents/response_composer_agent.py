@@ -10,14 +10,14 @@ def _style_prefix(preference_signals: dict[str, str]) -> str:
     support_style = preference_signals.get("support_style", "").lower()
     preferred_support_mode = preference_signals.get("preferred_support_mode", "").lower()
 
-    if support_style == "direct":
-        return "I'll keep this practical and clear."
-    if support_style == "reflective":
-        return "I'll stay thoughtful and gentle with this."
     if preferred_support_mode == "plan":
         return "Let's make this concrete."
     if preferred_support_mode == "recover":
         return "Let's keep this calming and restorative."
+    if support_style == "direct":
+        return "I'll keep this practical and clear."
+    if support_style == "reflective":
+        return "I'll stay thoughtful and gentle with this."
     return ""
 
 

@@ -31,9 +31,6 @@ class MemoryService:
         normalized_source = source_type.strip().lower()
         normalized_content = content.lower()
 
-        if normalized_source in {"check_in", "journal_entry", "conversation_message"}:
-            return "episodic"
-
         if normalized_source in {"user_preference", "preference", "support_preference"}:
             return "preference"
 
@@ -56,6 +53,9 @@ class MemoryService:
             ]
         ):
             return "helpful_strategy"
+
+        if normalized_source in {"check_in", "journal_entry", "conversation_message"}:
+            return "episodic"
 
         return "episodic"
 
