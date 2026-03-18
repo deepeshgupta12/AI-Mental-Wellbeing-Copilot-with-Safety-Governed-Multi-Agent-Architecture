@@ -23,6 +23,9 @@ from mental_wellbeing_api.agents.journaling_insight_agent import (
 from mental_wellbeing_api.agents.policy_guardrail_agent import (
     run_policy_guardrail_agent,
 )
+from mental_wellbeing_api.agents.preference_learning_agent import (
+    run_preference_learning_agent,
+)
 from mental_wellbeing_api.agents.reflective_agent import run_reflective_agent
 from mental_wellbeing_api.agents.response_composer_agent import (
     run_response_composer_agent,
@@ -88,6 +91,7 @@ def build_agent_runtime_graph():
     graph.add_node("journaling_insight", run_journaling_insight_agent)
     graph.add_node("habit_care_plan", run_habit_care_plan_agent)
 
+    graph.add_node("preference_learning", run_preference_learning_agent)
     graph.add_node("response_composer", run_response_composer_agent)
     graph.add_node("policy_guardrail", run_policy_guardrail_agent)
     graph.add_node("execution_finalize", run_execution_finalize_agent)
@@ -123,15 +127,16 @@ def build_agent_runtime_graph():
         },
     )
 
-    graph.add_edge("reflective_support", "response_composer")
-    graph.add_edge("distress_stabilization", "response_composer")
-    graph.add_edge("behavioral_activation", "response_composer")
-    graph.add_edge("cbt_reframing", "response_composer")
-    graph.add_edge("sleep_recovery", "response_composer")
-    graph.add_edge("social_support", "response_composer")
-    graph.add_edge("journaling_insight", "response_composer")
-    graph.add_edge("habit_care_plan", "response_composer")
+    graph.add_edge("reflective_support", "preference_learning")
+    graph.add_edge("distress_stabilization", "preference_learning")
+    graph.add_edge("behavioral_activation", "preference_learning")
+    graph.add_edge("cbt_reframing", "preference_learning")
+    graph.add_edge("sleep_recovery", "preference_learning")
+    graph.add_edge("social_support", "preference_learning")
+    graph.add_edge("journaling_insight", "preference_learning")
+    graph.add_edge("habit_care_plan", "preference_learning")
 
+    graph.add_edge("preference_learning", "response_composer")
     graph.add_edge("response_composer", "policy_guardrail")
     graph.add_edge("policy_guardrail", "execution_finalize")
     graph.add_edge("execution_finalize", END)

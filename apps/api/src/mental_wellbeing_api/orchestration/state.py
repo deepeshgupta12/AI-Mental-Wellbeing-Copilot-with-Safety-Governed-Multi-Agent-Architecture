@@ -17,6 +17,7 @@ class AgentRuntimeState(TypedDict, total=False):
     recalled_memories: list[str]
     recalled_memory_items: list[dict[str, Any]]
     preference_signals: dict[str, str]
+    learned_preferences: dict[str, str]
     what_helped_before: list[str]
     session_context: str
 

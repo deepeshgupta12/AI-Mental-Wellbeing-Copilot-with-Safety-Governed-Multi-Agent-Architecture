@@ -55,3 +55,76 @@ class PreferenceService:
     async def user_exists(self, user_id: str) -> bool:
         user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
         return bool(user_exists)
+
+    async def upsert_preference(
+        self,
+        *,
+        user_id: str,
+        preference_key: str,
+        value: str,
+        source: str = "system",
+        confidence_score: float | None = None,
+    ) -> None:
+        existing = await self.session.scalar(
+            select(UserPreference)
+            .where(
+                UserPreference.user_id == user_id,
+                UserPreference.preference_key == preference_key,
+                UserPreference.is_active.is_(True),
+            )
+            .order_by(desc(UserPreference.updated_at), desc(UserPreference.created_at))
+            .limit(1)
+        )
+
+        payload = {"value": value}
+
+        if existing:
+            existing.preference_value_json = payload
+            existing.source = source
+            existing.confidence_score = confidence_score
+        else:
+            self.session.add(
+                UserPreference(
+                    user_id=user_id,
+                    preference_key=preference_key,
+                    preference_value_json=payload,
+                    source=source,
+                    confidence_score=confidence_score,
+                    is_active=True,
+                )
+            )
+
+        profile = await self.session.scalar(
+            select(UserProfile).where(UserProfile.user_id == user_id)
+        )
+        if profile is not None:
+            if preference_key == "support_style":
+                profile.support_style = value
+            if preference_key == "preferred_support_mode":
+                profile.preferred_support_mode = value
+
+            profile.preference_profile_json = {
+                **(profile.preference_profile_json or {}),
+                preference_key: value,
+            }
+
+        await self.session.commit()
+
+    async def persist_learned_preferences(
+        self,
+        *,
+        user_id: str,
+        learned_preferences: dict[str, str] | None,
+    ) -> None:
+        if not learned_preferences:
+            return
+
+        for key, value in learned_preferences.items():
+            if value:
+                await self.upsert_preference(
+                    user_id=user_id,
+                    preference_key=key,
+                    value=value,
+                    source="preference_learning_agent",
+                    confidence_score=0.72,
+                )

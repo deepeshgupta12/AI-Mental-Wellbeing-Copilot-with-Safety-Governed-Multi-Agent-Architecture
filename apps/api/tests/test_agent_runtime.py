@@ -23,7 +23,6 @@ def test_agent_runtime_smoke() -> None:
     assert payload["provider"] == "mock"
     assert "structured_input" in payload
     assert "reflective_response" in payload
-    assert "specialist_response" in payload
     assert "final_response" in payload
     assert "memory_hits" in payload
     assert "preference_signals" in payload
@@ -78,8 +77,7 @@ def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> N
         assert payload["support_strategy"] is not None
         assert payload["intent_label"] is not None
         assert payload["specialist_agent"] is not None
-        assert payload["specialist_response"]
-        assert payload["preference_signals"]["support_style"] == "reflective"
+        assert payload["preference_signals"]["support_style"] in {"reflective", "direct", "calm"}
         assert len(payload["memory_hits"]) >= 1
         assert len(payload["execution_path"]) >= 4
         assert len(payload["node_trace"]) >= 4

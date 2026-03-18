@@ -147,6 +147,7 @@ class AgentRuntimeService:
                     user_id=user_id,
                     query=payload.user_input,
                     limit=4,
+                    preference_signals=preference_signals,
                 )
 
                 what_helped_before = await self.memory_service.recall_texts(
@@ -154,6 +155,7 @@ class AgentRuntimeService:
                     query=payload.user_input,
                     limit=2,
                     memory_kinds=["helpful_strategy", "preference"],
+                    preference_signals=preference_signals,
                 )
 
                 await self._log_memory_trace(
@@ -198,11 +200,17 @@ class AgentRuntimeService:
         )
 
         if payload.user_id is not None:
+            user_id = str(payload.user_id)
             await self._log_execution_trace(
-                user_id=str(payload.user_id),
+                user_id=user_id,
                 trace_id=trace_id,
                 result=result,
             )
+            await self.preference_service.persist_learned_preferences(
+                user_id=user_id,
+                learned_preferences=result.get("learned_preferences"),
+            )
+            preference_signals = await self.preference_service.get_preference_signals(user_id)
 
         if (
             payload.user_id is not None
