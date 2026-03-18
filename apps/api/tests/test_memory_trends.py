@@ -43,7 +43,7 @@ def test_memory_and_trend_basics() -> None:
             json={
                 "user_id": user_id,
                 "title": "Short reflection",
-                "content": "Work was intense today but I handled it better than usual.",
+                "content": "Work was intense today but I handled it better than usual after work.",
                 "entry_type": "freeform",
             },
         )
@@ -81,6 +81,8 @@ def test_memory_and_trend_basics() -> None:
         assert "helpful_before" in memory_payload
         assert "recurring_triggers" in memory_payload
         assert "preference_signals" in memory_payload
+        assert "weekly_reflection_summary" in memory_payload
+        assert "recent_journal_themes" in memory_payload
         assert memory_payload["preference_signals"]["support_style"] == "calm"
         assert any("memory_kind" in item for item in memory_payload["recent_memories"])
 
@@ -96,3 +98,5 @@ def test_memory_and_trend_basics() -> None:
         assert trend_payload["total_conversation_messages"] == 1
         assert "latest_snapshot_window_type" in trend_payload
         assert "latest_snapshot_created_at" in trend_payload
+        assert "top_journal_themes" in trend_payload
+        assert "recurring_trigger_count" in trend_payload

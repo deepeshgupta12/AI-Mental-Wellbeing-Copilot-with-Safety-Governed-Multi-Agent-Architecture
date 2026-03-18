@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,6 +11,7 @@ from mental_wellbeing_api.api.deps import db_session_dep
 from mental_wellbeing_api.models.check_in import CheckIn
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.models.journal_entry import JournalEntry
+from mental_wellbeing_api.models.journal_theme import JournalTheme
 from mental_wellbeing_api.models.memory_chunk import MemoryChunk
 from mental_wellbeing_api.models.trend_snapshot import TrendSnapshot
 from mental_wellbeing_api.models.trigger_cluster import TriggerCluster
@@ -103,9 +104,8 @@ async def get_memory_summary(
         if item.memory_kind == "helpful_strategy"
     ][:3]
 
-    recurring_triggers = [
-        item.cluster_name
-        for item in (
+    recurring_trigger_rows = list(
+        (
             await session.scalars(
                 select(TriggerCluster)
                 .where(TriggerCluster.user_id == str(user_id))
@@ -113,9 +113,31 @@ async def get_memory_summary(
                 .limit(5)
             )
         ).all()
-    ]
+    )
+    recurring_triggers = [item.cluster_name for item in recurring_trigger_rows]
+
+    recent_theme_rows = (
+        await session.execute(
+            select(JournalTheme.theme_name, func.count(JournalTheme.id).label("theme_count"))
+            .where(JournalTheme.user_id == str(user_id))
+            .group_by(JournalTheme.theme_name)
+            .order_by(desc("theme_count"), JournalTheme.theme_name.asc())
+            .limit(5)
+        )
+    ).all()
+    recent_journal_themes = [row.theme_name for row in recent_theme_rows]
 
     preference_signals = await PreferenceService(session).get_preference_signals(str(user_id))
+
+    latest_weekly_snapshot = await session.scalar(
+        select(TrendSnapshot)
+        .where(
+            TrendSnapshot.user_id == str(user_id),
+            TrendSnapshot.window_type == "weekly_reflection",
+        )
+        .order_by(TrendSnapshot.created_at.desc())
+        .limit(1)
+    )
 
     chunk_lookup: dict[tuple[str, str], MemoryChunk] = {
         (item.source_type, item.source_id): item for item in recent_memory_chunks
@@ -187,6 +209,12 @@ async def get_memory_summary(
         helpful_before=helpful_before,
         recurring_triggers=recurring_triggers,
         preference_signals=preference_signals,
+        weekly_reflection_summary=(
+            latest_weekly_snapshot.summary_json.get("summary")
+            if latest_weekly_snapshot and isinstance(latest_weekly_snapshot.summary_json, dict)
+            else None
+        ),
+        recent_journal_themes=recent_journal_themes,
     )
 
 
@@ -249,6 +277,25 @@ async def get_trend_summary(
         .limit(1)
     )
 
+    top_theme_rows = (
+        await session.execute(
+            select(JournalTheme.theme_name, func.count(JournalTheme.id).label("theme_count"))
+            .where(JournalTheme.user_id == str(user_id))
+            .group_by(JournalTheme.theme_name)
+            .order_by(desc("theme_count"), JournalTheme.theme_name.asc())
+            .limit(5)
+        )
+    ).all()
+
+    recurring_trigger_count = int(
+        (
+            await session.execute(
+                select(func.count(TriggerCluster.id)).where(TriggerCluster.user_id == str(user_id))
+            )
+        ).scalar()
+        or 0
+    )
+
     return TrendSummaryResponse(
         user_id=str(user_id),
         total_check_ins=int(check_in_stats[0] or 0),
@@ -264,4 +311,6 @@ async def get_trend_summary(
         total_conversation_messages=int(message_stats[0] or 0),
         latest_snapshot_window_type=latest_snapshot.window_type if latest_snapshot else None,
         latest_snapshot_created_at=latest_snapshot.created_at if latest_snapshot else None,
+        top_journal_themes=[row.theme_name for row in top_theme_rows],
+        recurring_trigger_count=recurring_trigger_count,
     )
