@@ -19,6 +19,9 @@ class JournalEntryResponse(BaseModel):
     title: str | None
     content: str
     entry_type: str | None
+    summary: str | None
+    emotional_tone: str | None
+    structured_insights_json: dict | None
     created_at: datetime
     updated_at: datetime
 

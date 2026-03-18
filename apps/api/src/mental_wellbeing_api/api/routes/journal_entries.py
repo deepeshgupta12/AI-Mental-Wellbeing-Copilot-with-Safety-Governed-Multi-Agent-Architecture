@@ -13,6 +13,9 @@ from mental_wellbeing_api.schemas.journal_entry import (
     JournalEntryCreateRequest,
     JournalEntryResponse,
 )
+from mental_wellbeing_api.services.journaling_intelligence_service import (
+    JournalingIntelligenceService,
+)
 from mental_wellbeing_api.services.memory_service import MemoryService
 
 router = APIRouter(prefix="/journal-entries", tags=["journal-entries"])
@@ -25,10 +28,29 @@ async def create_journal_entry(
 ) -> JournalEntryResponse:
     await ensure_user_exists(session, str(payload.user_id))
 
-    item = JournalEntry(**payload.model_dump(mode="json"))
+    journaling_service = JournalingIntelligenceService(session)
+    analysis = journaling_service.analyze_entry(
+        content=payload.content,
+        title=payload.title,
+        entry_type=payload.entry_type,
+    )
+
+    item = JournalEntry(
+        **payload.model_dump(mode="json"),
+        summary=analysis.summary,
+        emotional_tone=analysis.emotional_tone,
+        structured_insights_json=analysis.structured_insights_json,
+    )
     session.add(item)
     await session.commit()
     await session.refresh(item)
+
+    await journaling_service.persist_journal_derivatives(
+        user_id=item.user_id,
+        journal_entry=item,
+        analysis=analysis,
+    )
+    await journaling_service.upsert_weekly_reflection_snapshot(user_id=item.user_id)
 
     await MemoryService(session).add_memory(
         user_id=item.user_id,
@@ -36,6 +58,7 @@ async def create_journal_entry(
         source_id=item.id,
         content=item.content,
     )
+
     await session.refresh(item)
     return item
 
