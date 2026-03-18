@@ -1,3 +1,4 @@
+from mental_wellbeing_api.db import models as _models  # noqa: F401
 from mental_wellbeing_api.db.base import Base
 
 
