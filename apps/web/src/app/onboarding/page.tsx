@@ -1,3 +1,4 @@
+// apps/web/src/app/onboarding/page.tsx
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -14,6 +15,7 @@ import {
   ListChecks,
   Moon,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,16 +23,63 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import { setCurrentUserSession } from "@/lib/demo-session";
 import { createUser } from "@/lib/users-api";
 
-const steps = [
+type SelectionValue = string | string[];
+
+type StepOption = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  desc?: string;
+};
+
+type ChoiceStep = {
+  id: "intent" | "style" | "focus";
+  title: string;
+  subtitle: string;
+  options: readonly StepOption[];
+  multiSelect?: boolean;
+  isBoundary?: false;
+};
+
+type BoundaryStep = {
+  id: "boundaries";
+  title: string;
+  subtitle: string;
+  isBoundary: true;
+};
+
+type OnboardingStep = ChoiceStep | BoundaryStep;
+
+const steps: readonly OnboardingStep[] = [
   {
     id: "intent",
     title: "What brings you to Aether?",
     subtitle: "Choose what resonates most. You can change this anytime.",
     options: [
-      { id: "burnout", label: "Burnout Recovery", icon: Flame, desc: "Rest, reset, and rebuild energy." },
-      { id: "clarity", label: "Emotional Clarity", icon: Brain, desc: "Understand what you feel and why." },
-      { id: "habits", label: "Habit Support", icon: ListChecks, desc: "Build sustainable wellbeing routines." },
-      { id: "prevention", label: "Crisis Prevention", icon: Heart, desc: "Early awareness and safe support." },
+      {
+        id: "burnout",
+        label: "Burnout Recovery",
+        icon: Flame,
+        desc: "Rest, reset, and rebuild energy.",
+      },
+      {
+        id: "clarity",
+        label: "Emotional Clarity",
+        icon: Brain,
+        desc: "Understand what you feel and why.",
+      },
+      {
+        id: "habits",
+        label: "Habit Support",
+        icon: ListChecks,
+        desc: "Build sustainable wellbeing routines.",
+      },
+      {
+        id: "prevention",
+        label: "Crisis Prevention",
+        icon: Heart,
+        desc: "Early awareness and safe support.",
+      },
     ],
   },
   {
@@ -38,9 +87,24 @@ const steps = [
     title: "How should we communicate?",
     subtitle: "This shapes the tone of your conversations.",
     options: [
-      { id: "direct", label: "Direct & Structured", icon: Zap, desc: "Clear, efficient, action-oriented." },
-      { id: "reflective", label: "Soft & Reflective", icon: Cloud, desc: "Gentle, exploratory, open-ended." },
-      { id: "minimal", label: "Minimalist", icon: Feather, desc: "Less is more. Brief and calm." },
+      {
+        id: "direct",
+        label: "Direct & Structured",
+        icon: Zap,
+        desc: "Clear, efficient, action-oriented.",
+      },
+      {
+        id: "reflective",
+        label: "Soft & Reflective",
+        icon: Cloud,
+        desc: "Gentle, exploratory, open-ended.",
+      },
+      {
+        id: "minimal",
+        label: "Minimalist",
+        icon: Feather,
+        desc: "Less is more. Brief and calm.",
+      },
     ],
   },
   {
@@ -65,18 +129,22 @@ const steps = [
   },
 ] as const;
 
-function buildEmailFromSelections(selections: Record<string, string | string[]>) {
+function isBoundaryStep(step: OnboardingStep): step is BoundaryStep {
+  return step.id === "boundaries";
+}
+
+function buildEmailFromSelections(selections: Record<string, SelectionValue>) {
   const style = typeof selections.style === "string" ? selections.style : "reflective";
   const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
   return `${intent}-${style}-${Date.now()}@example.com`;
 }
 
-function buildDisplayName(selections: Record<string, string | string[]>) {
+function buildDisplayName(selections: Record<string, SelectionValue>) {
   const intent = typeof selections.intent === "string" ? selections.intent : "Aether";
   return `${intent.charAt(0).toUpperCase()}${intent.slice(1)} User`;
 }
 
-function buildGoals(selections: Record<string, string | string[]>) {
+function buildGoals(selections: Record<string, SelectionValue>) {
   const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
   const goalsMap: Record<string, string> = {
     burnout: "Recover energy and reduce burnout.",
@@ -90,7 +158,7 @@ function buildGoals(selections: Record<string, string | string[]>) {
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
-  const [selections, setSelections] = useState<Record<string, string | string[]>>({});
+  const [selections, setSelections] = useState<Record<string, SelectionValue>>({});
 
   const step = steps[currentStep];
   const progress = ((currentStep + 1) / steps.length) * 100;
@@ -108,26 +176,24 @@ export default function OnboardingPage() {
   });
 
   const handleSelect = (optionId: string) => {
-    if ("multiSelect" in step && step.multiSelect) {
-      const current = (selections[step.id] as string[]) || [];
+    if (!isBoundaryStep(step) && step.multiSelect) {
+      const current = Array.isArray(selections[step.id]) ? (selections[step.id] as string[]) : [];
       const updated = current.includes(optionId)
         ? current.filter((id) => id !== optionId)
         : [...current, optionId];
       setSelections({ ...selections, [step.id]: updated });
-    } else {
-      setSelections({ ...selections, [step.id]: optionId });
+      return;
     }
+
+    setSelections({ ...selections, [step.id]: optionId });
   };
 
-  const canProceed =
-    "isBoundary" in step && step.isBoundary
-      ? true
-      : !!(
-          selections[step.id] &&
-          (Array.isArray(selections[step.id])
-            ? (selections[step.id] as string[]).length > 0
-            : true)
-        );
+  const canProceed = isBoundaryStep(step)
+    ? true
+    : !!(
+        selections[step.id] &&
+        (Array.isArray(selections[step.id]) ? (selections[step.id] as string[]).length > 0 : true)
+      );
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
@@ -139,12 +205,9 @@ export default function OnboardingPage() {
       email: buildEmailFromSelections(selections),
       display_name: buildDisplayName(selections),
       timezone: "Asia/Kolkata",
-      support_style:
-        typeof selections.style === "string" ? selections.style : "reflective",
+      support_style: typeof selections.style === "string" ? selections.style : "reflective",
       wellbeing_goals: buildGoals(selections),
-      focus_areas: Array.isArray(selections.focus)
-        ? selections.focus.join(",")
-        : "",
+      focus_areas: Array.isArray(selections.focus) ? selections.focus.join(",") : "",
     });
   };
 
@@ -173,42 +236,40 @@ export default function OnboardingPage() {
                 {step.title}
               </h1>
 
-              {step.subtitle && (
-                <p className="mb-8 text-sm text-muted-foreground">{step.subtitle}</p>
-              )}
+              {step.subtitle && <p className="mb-8 text-sm text-muted-foreground">{step.subtitle}</p>}
 
-              {"isBoundary" in step && step.isBoundary ? (
+              {isBoundaryStep(step) ? (
                 <div className="mb-8 space-y-5">
                   <div className="rounded-lg border border-border bg-card p-5 shadow-card">
                     <p className="mb-3 text-sm leading-relaxed text-foreground">
-                      <strong>Aether is</strong> a wellbeing companion for
-                      self-reflection, coping guidance, habit support, and trend awareness.
+                      <strong>Aether is</strong> a wellbeing companion for self-reflection, coping
+                      guidance, habit support, and trend awareness.
                     </p>
                     <p className="mb-3 text-sm leading-relaxed text-foreground">
-                      <strong>Aether is not</strong> a therapist, a clinical diagnostic
-                      tool, or an emergency response system.
+                      <strong>Aether is not</strong> a therapist, a clinical diagnostic tool, or an
+                      emergency response system.
                     </p>
                     <p className="text-sm leading-relaxed text-muted-foreground">
-                      If you are in crisis, Aether will guide you to appropriate resources.
-                      Human oversight governs safety at every layer of this system.
+                      If you are in crisis, Aether will guide you to appropriate resources. Human
+                      oversight governs safety at every layer of this system.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div
                   className={`mb-8 grid gap-3 ${
-                    step.options && step.options.length > 3 ? "grid-cols-2" : "grid-cols-1"
+                    step.options.length > 3 ? "grid-cols-2" : "grid-cols-1"
                   }`}
                 >
-                  {step.options?.map((opt) => {
-                    const isSelected =
-                      "multiSelect" in step && step.multiSelect
-                        ? ((selections[step.id] as string[]) || []).includes(opt.id)
-                        : selections[step.id] === opt.id;
+                  {step.options.map((opt) => {
+                    const isSelected = step.multiSelect
+                      ? ((selections[step.id] as string[]) || []).includes(opt.id)
+                      : selections[step.id] === opt.id;
 
                     return (
                       <button
                         key={opt.id}
+                        type="button"
                         onClick={() => handleSelect(opt.id)}
                         className={`rounded-lg border p-4 text-left transition-aether ${
                           isSelected
@@ -224,13 +285,9 @@ export default function OnboardingPage() {
                             strokeWidth={1.5}
                           />
                           <div>
-                            <span className="text-sm font-medium text-foreground">
-                              {opt.label}
-                            </span>
-                            {"desc" in opt && opt.desc && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                {opt.desc}
-                              </p>
+                            <span className="text-sm font-medium text-foreground">{opt.label}</span>
+                            {opt.desc && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{opt.desc}</p>
                             )}
                           </div>
                         </div>
@@ -255,7 +312,7 @@ export default function OnboardingPage() {
               >
                 {createUserMutation.isPending
                   ? "Creating your space..."
-                  : "isBoundary" in step && step.isBoundary
+                  : isBoundaryStep(step)
                     ? "I understand"
                     : currentStep === steps.length - 1
                       ? "Begin"
