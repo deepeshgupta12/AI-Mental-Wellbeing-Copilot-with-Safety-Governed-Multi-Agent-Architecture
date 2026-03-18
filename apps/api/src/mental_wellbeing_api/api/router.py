@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from mental_wellbeing_api.api.routes.action_plans import router as action_plans_router
+from mental_wellbeing_api.api.routes.admin import router as admin_router
 from mental_wellbeing_api.api.routes.agent_runtime import router as agent_runtime_router
 from mental_wellbeing_api.api.routes.check_ins import router as check_ins_router
 from mental_wellbeing_api.api.routes.conversations import router as conversations_router
@@ -20,3 +21,4 @@ api_router.include_router(conversations_router)
 api_router.include_router(action_plans_router)
 api_router.include_router(safety_flags_router)
 api_router.include_router(memory_trends_router)
+api_router.include_router(admin_router)

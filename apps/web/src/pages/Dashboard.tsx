@@ -59,11 +59,22 @@ export default function DashboardPage() {
     enabled: !!userId,
   });
 
-  const displayName =
-    memoryQuery.data?.display_name || storedName || "there";
-
+  const displayName = memoryQuery.data?.display_name || storedName || "there";
   const latestMemory = memoryQuery.data?.recent_memories?.[0];
   const planItems = (plansQuery.data ?? []).slice(0, 3);
+  const trend = trendQuery.data;
+
+  const followUpSuggestions = [
+    trend?.avg_stress_score != null && trend.avg_stress_score >= 7
+      ? "Stress is running high. Try one tiny decompression step tonight."
+      : null,
+    trend?.avg_sleep_hours != null && trend.avg_sleep_hours < 7
+      ? "Sleep looks light. Aim for a gentler wind-down before bed."
+      : null,
+    planItems.length === 0
+      ? "You do not have a support plan yet. Save one small action for today."
+      : "You already have a support plan. Revisit one step and keep it small.",
+  ].filter(Boolean) as string[];
 
   return (
     <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
@@ -128,32 +139,32 @@ export default function DashboardPage() {
                     {
                       label: "Mood",
                       value:
-                        trendQuery.data?.avg_mood_score != null
-                          ? `${trendQuery.data.avg_mood_score}/10`
+                        trend?.avg_mood_score != null
+                          ? `${trend.avg_mood_score}/10`
                           : "—",
                       icon: Sun,
-                      trend: `${trendQuery.data?.total_check_ins ?? 0} total check-ins`,
+                      trend: `${trend?.total_check_ins ?? 0} total check-ins`,
                     },
                     {
                       label: "Sleep",
                       value:
-                        trendQuery.data?.avg_sleep_hours != null
-                          ? `${trendQuery.data.avg_sleep_hours}h`
+                        trend?.avg_sleep_hours != null
+                          ? `${trend.avg_sleep_hours}h`
                           : "—",
                       icon: Moon,
                       trend:
-                        trendQuery.data?.latest_check_in_at
+                        trend?.latest_check_in_at
                           ? "Based on recent entries"
                           : "No recent check-ins",
                     },
                     {
                       label: "Stress",
                       value:
-                        trendQuery.data?.avg_stress_score != null
-                          ? `${trendQuery.data.avg_stress_score}/10`
+                        trend?.avg_stress_score != null
+                          ? `${trend.avg_stress_score}/10`
                           : "—",
                       icon: Zap,
-                      trend: `${trendQuery.data?.total_journal_entries ?? 0} journal entries`,
+                      trend: `${trend?.total_journal_entries ?? 0} journal entries`,
                     },
                   ].map((metric) => (
                     <div key={metric.label} className="text-center">
@@ -238,7 +249,24 @@ export default function DashboardPage() {
               )}
             </motion.div>
 
-            <motion.div variants={fadeIn} custom={5} className="pt-4 border-t border-border">
+            <motion.div
+              variants={fadeIn}
+              custom={5}
+              className="p-6 rounded-lg border border-border bg-card shadow-card mb-6"
+            >
+              <h2 className="font-heading font-semibold text-foreground text-sm mb-4">
+                Follow-up Suggestions
+              </h2>
+              <div className="space-y-2.5">
+                {followUpSuggestions.map((item, index) => (
+                  <div key={index} className="rounded-md border border-border bg-background p-3">
+                    <p className="text-sm text-muted-foreground leading-relaxed">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+
+            <motion.div variants={fadeIn} custom={6} className="pt-4 border-t border-border">
               <Link
                 to="/app/safety"
                 className="flex items-center gap-2 text-sm text-urgent hover:text-urgent/80 transition-aether font-medium"

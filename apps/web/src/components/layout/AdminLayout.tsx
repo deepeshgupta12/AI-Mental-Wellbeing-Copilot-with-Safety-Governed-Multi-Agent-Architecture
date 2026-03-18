@@ -2,21 +2,19 @@ import { Outlet, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Flag,
+  MessageCircleMore,
   FileSearch,
-  ShieldAlert,
   ScrollText,
   Cog,
-  BarChart3,
 } from "lucide-react";
 
 const adminNav = [
   { title: "Overview", url: "/admin", icon: LayoutDashboard },
   { title: "Flagged Sessions", url: "/admin/flagged", icon: Flag },
+  { title: "Session Logs", url: "/admin/sessions", icon: MessageCircleMore },
   { title: "Case Reviews", url: "/admin/cases", icon: FileSearch },
-  { title: "Safety Events", url: "/admin/safety-events", icon: ShieldAlert },
   { title: "Audit Logs", url: "/admin/audit", icon: ScrollText },
   { title: "Policy & Prompts", url: "/admin/policy", icon: Cog },
-  { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
 export function AdminLayout() {

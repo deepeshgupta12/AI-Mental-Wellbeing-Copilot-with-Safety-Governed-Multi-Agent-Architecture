@@ -238,3 +238,40 @@ export type SafetyEvaluationResponse = {
   safety_summary: string | null;
   safety_override: boolean;
 };
+
+export type AdminFlaggedSession = {
+  id: string;
+  user_id: string;
+  severity: string;
+  flag_type: string;
+  summary: string | null;
+  needs_review: boolean;
+  is_resolved: boolean;
+  created_at: string;
+};
+
+export type AdminSessionLog = {
+  session_id: string;
+  user_id: string;
+  title: string | null;
+  status: string;
+  started_at: string;
+  updated_at: string;
+  message_count: number;
+  latest_message_at: string | null;
+};
+
+export type AdminAuditItem = {
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  title: string;
+  details: string;
+  user_id: string | null;
+  occurred_at: string;
+};
+
+export type AdminPolicyConfig = {
+  runtime_policy: Record<string, unknown>;
+  prompt_registry: Record<string, unknown>;
+};
