@@ -19,6 +19,7 @@ Keep the output brief, neutral, and useful for downstream routing.
     user_prompt = (
         f"User input:\n{state['user_input']}\n\n"
         f"Session context:\n{state.get('session_context', '')}\n\n"
+        f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
         "Return a concise structured summary."
     )
     structured_input = llm.generate_text(state["provider"], system_prompt, user_prompt)
@@ -35,7 +36,7 @@ Keep the output brief, neutral, and useful for downstream routing.
     state = append_handoff(
         state,
         from_agent="input_structuring",
-        to_agent="intent_router",
+        to_agent="tone_emotion_analyzer",
         reason="structured summary generated",
     )
     return state

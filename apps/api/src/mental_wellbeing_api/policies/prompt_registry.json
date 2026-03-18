@@ -4,6 +4,11 @@
     "agents/reflective_support.txt": "agents/reflective_support.txt",
     "agents/response_composer.txt": "agents/response_composer.txt",
     "agents/distress_stabilization.txt": "agents/distress_stabilization.txt",
-    "agents/behavioral_activation.txt": "agents/behavioral_activation.txt"
+    "agents/behavioral_activation.txt": "agents/behavioral_activation.txt",
+    "agents/cbt_reframing.txt": "agents/cbt_reframing.txt",
+    "agents/sleep_recovery.txt": "agents/sleep_recovery.txt",
+    "agents/social_support.txt": "agents/social_support.txt",
+    "agents/journaling_insight.txt": "agents/journaling_insight.txt",
+    "agents/habit_care_plan.txt": "agents/habit_care_plan.txt"
   }
 }

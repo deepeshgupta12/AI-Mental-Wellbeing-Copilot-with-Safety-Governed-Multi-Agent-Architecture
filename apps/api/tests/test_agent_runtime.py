@@ -31,6 +31,12 @@ def test_agent_runtime_smoke() -> None:
     assert "node_trace" in payload
     assert "handoff_history" in payload
     assert "routing_contract" in payload
+    assert "tone_label" in payload
+    assert "emotion_label" in payload
+    assert "support_mode" in payload
+    assert "coping_recommendations" in payload
+    assert "journaling_insights" in payload
+    assert "follow_up_suggestions" in payload
 
 
 def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> None:
@@ -77,11 +83,12 @@ def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> N
         assert payload["support_strategy"] is not None
         assert payload["intent_label"] is not None
         assert payload["specialist_agent"] is not None
+        assert payload["support_mode"] is not None
         assert payload["preference_signals"]["support_style"] == "reflective"
         assert len(payload["memory_hits"]) >= 1
-        assert len(payload["execution_path"]) >= 4
-        assert len(payload["node_trace"]) >= 4
-        assert len(payload["handoff_history"]) >= 3
+        assert len(payload["execution_path"]) >= 5
+        assert len(payload["node_trace"]) >= 5
+        assert len(payload["handoff_history"]) >= 4
         assert payload["memory_hits"][0]["memory_kind"] in {
             "episodic",
             "helpful_strategy",

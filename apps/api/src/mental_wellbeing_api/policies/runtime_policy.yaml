@@ -14,9 +14,10 @@ memory:
   fallback_to_recency: true
 
 routing:
-  contract_name: v2-routing-core
+  contract_name: v2-specialist-routing
   default_intent: general_reflection
   default_strategy: reflective
+  default_support_mode: reflect
   medium_risk_strategy: distress_stabilization
   direct_style_action_bias: true
   behavioral_activation_hints:
@@ -27,6 +28,14 @@ routing:
     - exhausted
     - avoid
     - procrastinating
+  specialist_map:
+    sleep_recovery: sleep_recovery
+    social_support: social_support
+    journaling_insight: journaling_insight
+    cognitive_reframing: cbt_reframing
+    habit_support: habit_care_plan
+    stress_overwhelm: behavioral_activation
+    general_reflection: reflective_support
 
 response:
   max_final_response_chars: 1200

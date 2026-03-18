@@ -42,13 +42,20 @@ class AgentRuntimeSmokeResponse(BaseModel):
     provider: str
     structured_input: str
     reflective_response: str
+    specialist_response: str | None = None
     final_response: str
     risk_level: str
     safety_flag_type: str | None = None
     safety_summary: str | None = None
     safety_override: bool
 
+    tone_label: str | None = None
+    emotion_label: str | None = None
+    emotion_intensity: str | None = None
+    emotional_signals: list[str] = Field(default_factory=list)
+
     intent_label: str | None = None
+    support_mode: str | None = None
     support_strategy: str | None = None
     specialist_agent: str | None = None
     routing_reason: str | None = None
@@ -57,6 +64,9 @@ class AgentRuntimeSmokeResponse(BaseModel):
     session_context: str | None = None
     preference_signals: dict[str, str] = Field(default_factory=dict)
     what_helped_before: list[str] = Field(default_factory=list)
+    coping_recommendations: list[str] = Field(default_factory=list)
+    journaling_insights: list[str] = Field(default_factory=list)
+    follow_up_suggestions: list[str] = Field(default_factory=list)
     memory_hits: list[RecalledMemoryItemResponse] = Field(default_factory=list)
 
     execution_path: list[str] = Field(default_factory=list)

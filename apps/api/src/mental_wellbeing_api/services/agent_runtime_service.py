@@ -33,7 +33,8 @@ class AgentRuntimeService:
         self.preference_service = PreferenceService(session)
 
     async def evaluate_safety_only(
-        self, payload: AgentRuntimeSmokeRequest
+        self,
+        payload: AgentRuntimeSmokeRequest,
     ) -> SafetyEvaluationResponse:
         return self.safety_service.evaluate_text(payload.user_input)
 
@@ -110,6 +111,8 @@ class AgentRuntimeService:
                     "routing_contract": result.get("routing_contract", {}),
                     "intent_label": result.get("intent_label"),
                     "support_strategy": result.get("support_strategy"),
+                    "support_mode": result.get("support_mode"),
+                    "specialist_agent": result.get("specialist_agent"),
                 },
                 output_payload_json={
                     "status": event.get("status"),
@@ -124,7 +127,8 @@ class AgentRuntimeService:
         await self.session.commit()
 
     async def run_smoke_flow(
-        self, payload: AgentRuntimeSmokeRequest
+        self,
+        payload: AgentRuntimeSmokeRequest,
     ) -> AgentRuntimeSmokeResponse:
         safety_eval = self.safety_service.evaluate_text(payload.user_input)
 
@@ -183,6 +187,9 @@ class AgentRuntimeService:
                 ],
                 "preference_signals": preference_signals,
                 "what_helped_before": what_helped_before,
+                "coping_recommendations": [],
+                "journaling_insights": [],
+                "follow_up_suggestions": [],
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
@@ -221,12 +228,18 @@ class AgentRuntimeService:
             provider=payload.provider,
             structured_input=result.get("structured_input", ""),
             reflective_response=result.get("reflective_response", ""),
+            specialist_response=result.get("specialist_response"),
             final_response=result.get("final_response", ""),
             risk_level=result.get("risk_level", "low"),
             safety_flag_type=result.get("safety_flag_type"),
             safety_summary=result.get("safety_summary"),
             safety_override=bool(result.get("safety_override", False)),
+            tone_label=result.get("tone_label"),
+            emotion_label=result.get("emotion_label"),
+            emotion_intensity=result.get("emotion_intensity"),
+            emotional_signals=result.get("emotional_signals", []),
             intent_label=result.get("intent_label"),
+            support_mode=result.get("support_mode"),
             support_strategy=result.get("support_strategy"),
             specialist_agent=result.get("specialist_agent"),
             routing_reason=result.get("routing_reason"),
@@ -234,6 +247,9 @@ class AgentRuntimeService:
             session_context=result.get("session_context"),
             preference_signals=preference_signals,
             what_helped_before=what_helped_before,
+            coping_recommendations=result.get("coping_recommendations", []),
+            journaling_insights=result.get("journaling_insights", []),
+            follow_up_suggestions=result.get("follow_up_suggestions", []),
             memory_hits=[
                 RecalledMemoryItemResponse(
                     source_type=item.source_type,
