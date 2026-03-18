@@ -27,6 +27,20 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "playwright-fixture.ts"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "playwright.config.ts",
+    "playwright-fixture.ts",
+    "vitest.config.ts",
+    "src/vite-env.d.ts",
+    "tsconfig.app.json",
+    "tsconfig.node.json"
+  ]
 }
