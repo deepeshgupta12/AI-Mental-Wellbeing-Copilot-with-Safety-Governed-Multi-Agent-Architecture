@@ -6,24 +6,21 @@ from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
 
 
-def run_behavioral_activation_agent(state: AgentRuntimeState) -> AgentRuntimeState:
+def run_habit_care_plan_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     llm = LLMService()
     system_prompt = load_prompt(
-        "agents/behavioral_activation.txt",
+        "agents/habit_care_plan.txt",
         """
-You are a calm, practical, non-clinical wellbeing assistant.
-Help the user identify one very small next action.
-Keep the response short, concrete, and encouraging.
+You are a non-clinical wellbeing assistant helping the user build a small, sustainable care plan.
+Focus on realistic consistency, not intensity. Keep the plan very small and specific.
 """,
     )
 
     user_prompt = (
         f"User input:\n{state['user_input']}\n\n"
-        f"Session context:\n{state.get('session_context', '')}\n\n"
-        f"Tone label: {state.get('tone_label', '')}\n"
-        f"Emotion label: {state.get('emotion_label', '')}\n\n"
         f"Structured summary:\n{state.get('structured_input', '')}\n\n"
-        "Write a brief response focused on one tiny doable next step."
+        f"Session context:\n{state.get('session_context', '')}\n\n"
+        "Write a brief response with one tiny habit plan, one trigger, and one easy fallback option."
     )
     specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
 
@@ -32,23 +29,23 @@ Keep the response short, concrete, and encouraging.
         "reflective_response": specialist_response,
         "specialist_response": specialist_response,
         "coping_recommendations": [
-            "Choose a two-minute reset action.",
-            "Reduce the first step until it feels almost too easy.",
+            "Anchor the habit to something that already happens daily.",
+            "Decide on a fallback version that still counts on hard days.",
         ],
         "journaling_insights": [],
         "follow_up_suggestions": [
-            "Come back after trying the smallest step and note what changed.",
+            "We can tighten this into a one-minute version if the current plan still feels heavy.",
         ],
     }
     state = append_execution_event(
         state,
-        node_name="behavioral_activation",
+        node_name="habit_care_plan",
         metadata={"response_length": len(specialist_response)},
     )
     state = append_handoff(
         state,
-        from_agent="behavioral_activation",
+        from_agent="habit_care_plan",
         to_agent="response_composer",
-        reason="behavioral activation draft prepared",
+        reason="habit care plan draft prepared",
     )
     return state

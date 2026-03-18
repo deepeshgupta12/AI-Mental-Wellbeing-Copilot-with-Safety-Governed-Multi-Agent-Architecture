@@ -6,24 +6,22 @@ from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
 
 
-def run_behavioral_activation_agent(state: AgentRuntimeState) -> AgentRuntimeState:
+def run_journaling_insight_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     llm = LLMService()
     system_prompt = load_prompt(
-        "agents/behavioral_activation.txt",
+        "agents/journaling_insight.txt",
         """
-You are a calm, practical, non-clinical wellbeing assistant.
-Help the user identify one very small next action.
-Keep the response short, concrete, and encouraging.
+You are a non-clinical wellbeing assistant helping the user extract insight from reflection or journaling.
+Identify themes, patterns, and one gentle question worth exploring next.
+Keep it concise and grounded.
 """,
     )
 
     user_prompt = (
         f"User input:\n{state['user_input']}\n\n"
-        f"Session context:\n{state.get('session_context', '')}\n\n"
-        f"Tone label: {state.get('tone_label', '')}\n"
-        f"Emotion label: {state.get('emotion_label', '')}\n\n"
         f"Structured summary:\n{state.get('structured_input', '')}\n\n"
-        "Write a brief response focused on one tiny doable next step."
+        f"Session context:\n{state.get('session_context', '')}\n\n"
+        "Write a brief response that highlights one or two themes and one reflective next question."
     )
     specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
 
@@ -31,24 +29,24 @@ Keep the response short, concrete, and encouraging.
         **state,
         "reflective_response": specialist_response,
         "specialist_response": specialist_response,
-        "coping_recommendations": [
-            "Choose a two-minute reset action.",
-            "Reduce the first step until it feels almost too easy.",
+        "coping_recommendations": [],
+        "journaling_insights": [
+            "There may be a recurring pattern worth naming more explicitly.",
+            "The feeling and the meaning you attach to it may be slightly different things.",
         ],
-        "journaling_insights": [],
         "follow_up_suggestions": [
-            "Come back after trying the smallest step and note what changed.",
+            "Write one sentence about what felt most important beneath the event itself.",
         ],
     }
     state = append_execution_event(
         state,
-        node_name="behavioral_activation",
+        node_name="journaling_insight",
         metadata={"response_length": len(specialist_response)},
     )
     state = append_handoff(
         state,
-        from_agent="behavioral_activation",
+        from_agent="journaling_insight",
         to_agent="response_composer",
-        reason="behavioral activation draft prepared",
+        reason="journaling insight draft prepared",
     )
     return state

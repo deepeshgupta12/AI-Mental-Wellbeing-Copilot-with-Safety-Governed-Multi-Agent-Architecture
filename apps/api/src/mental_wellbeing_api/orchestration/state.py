@@ -20,7 +20,13 @@ class AgentRuntimeState(TypedDict, total=False):
     what_helped_before: list[str]
     session_context: str
 
+    tone_label: str
+    emotion_label: str
+    emotion_intensity: str
+    emotional_signals: list[str]
+
     intent_label: str
+    support_mode: str
     support_strategy: str
     specialist_agent: str
     routing_reason: str
@@ -28,8 +34,13 @@ class AgentRuntimeState(TypedDict, total=False):
 
     structured_input: str
     reflective_response: str
+    specialist_response: str
     final_response: str
     execution_summary: str
+
+    coping_recommendations: list[str]
+    journaling_insights: list[str]
+    follow_up_suggestions: list[str]
 
     risk_level: str
     safety_flag_type: str
