@@ -14,6 +14,7 @@ from structlog.contextvars import bind_contextvars, clear_contextvars
 from mental_wellbeing_api.api.router import api_router
 from mental_wellbeing_api.core.config import get_settings
 from mental_wellbeing_api.core.logging import configure_logging
+from mental_wellbeing_api.core.telemetry import telemetry_span
 from mental_wellbeing_api.db.session import get_engine
 from mental_wellbeing_api.services.redis_client import get_redis_client
 
@@ -58,21 +59,38 @@ def create_app() -> FastAPI:
         )
 
         started_at = time.perf_counter()
-        try:
-            response = await call_next(request)
-        except Exception:
-            duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
-            logger.exception("request_failed", duration_ms=duration_ms)
-            raise
 
-        duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
-        response.headers["X-Request-ID"] = request_id
-        logger.info(
-            "request_completed",
-            status_code=response.status_code,
-            duration_ms=duration_ms,
-        )
-        return response
+        with telemetry_span(
+            "http.request",
+            {
+                "http.method": request.method,
+                "http.route": request.url.path,
+                "request.id": request_id,
+            },
+        ) as span:
+            try:
+                response = await call_next(request)
+            except Exception:
+                duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+                logger.exception("request_failed", duration_ms=duration_ms)
+                if span is not None:
+                    span.set_attribute("request.failed", True)
+                    span.set_attribute("request.duration_ms", duration_ms)
+                raise
+
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            response.headers["X-Request-ID"] = request_id
+
+            if span is not None:
+                span.set_attribute("http.status_code", response.status_code)
+                span.set_attribute("request.duration_ms", duration_ms)
+
+            logger.info(
+                "request_completed",
+                status_code=response.status_code,
+                duration_ms=duration_ms,
+            )
+            return response
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:

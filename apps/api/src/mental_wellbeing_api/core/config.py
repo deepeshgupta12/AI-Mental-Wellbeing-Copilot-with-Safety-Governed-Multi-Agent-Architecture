@@ -39,6 +39,12 @@ class Settings(BaseSettings):
         alias="CORS_ALLOW_ORIGINS",
     )
 
+    otel_enabled: bool = Field(default=False, alias="OTEL_ENABLED")
+    otel_service_name: str = Field(
+        default="mental-wellbeing-api",
+        alias="OTEL_SERVICE_NAME",
+    )
+
     @property
     def database_url(self) -> str:
         return (

@@ -16,6 +16,10 @@ import SafetyPage from "./pages/Safety";
 import SettingsPage from "./pages/Settings";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CaseReviewPage from "./pages/admin/CaseReview";
+import FlaggedSessionsPage from "./pages/admin/FlaggedSessions";
+import SessionLogsPage from "./pages/admin/SessionLogs";
+import AuditLogsPage from "./pages/admin/AuditLogs";
+import PolicyViewerPage from "./pages/admin/PolicyViewer";
 import NotFound from "./pages/NotFound";
 
 import { AppLayout } from "./components/layout/AppLayout";
@@ -44,7 +48,11 @@ const App = () => (
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="flagged" element={<FlaggedSessionsPage />} />
+          <Route path="sessions" element={<SessionLogsPage />} />
           <Route path="cases" element={<CaseReviewPage />} />
+          <Route path="audit" element={<AuditLogsPage />} />
+          <Route path="policy" element={<PolicyViewerPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

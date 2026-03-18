@@ -1,0 +1,25 @@
+service:
+  name: mental-wellbeing-api
+  version: "0.1.0"
+
+safety:
+  crisis_override_enabled: true
+  high_risk_requires_safe_redirect: true
+  medium_risk_prefers_stabilization: true
+  diagnosis_language_blocked: true
+
+memory:
+  vector_recall_enabled: true
+  recall_limit_default: 3
+  fallback_to_recency: true
+
+response:
+  max_final_response_chars: 1200
+  concise_style_default: true
+  non_clinical_required: true
+
+admin:
+  flagged_sessions_enabled: true
+  session_logs_enabled: true
+  audit_view_enabled: true
+  policy_view_enabled: true

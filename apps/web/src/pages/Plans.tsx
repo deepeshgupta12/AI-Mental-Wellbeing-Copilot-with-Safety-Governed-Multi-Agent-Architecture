@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Circle, Clock, RotateCcw } from "lucide-react";
+import { CheckCircle2, Circle, Clock } from "lucide-react";
 import { getCurrentUserId } from "@/lib/demo-session";
 import { listActionPlans } from "@/lib/action-plans-api";
+import { getTrendSummary } from "@/lib/memory-api";
 
 export default function PlansPage() {
   const userId = getCurrentUserId();
@@ -14,13 +15,33 @@ export default function PlansPage() {
     enabled: !!userId,
   });
 
+  const trendQuery = useQuery({
+    queryKey: ["trend-summary", userId],
+    queryFn: () => getTrendSummary(userId!),
+    enabled: !!userId,
+  });
+
   const plans = plansQuery.data ?? [];
+
+  const lightweightSuggestions = [
+    trendQuery.data?.avg_stress_score != null && trendQuery.data.avg_stress_score >= 7
+      ? "Choose one 5-minute unwind step for today."
+      : null,
+    trendQuery.data?.avg_sleep_hours != null && trendQuery.data.avg_sleep_hours < 7
+      ? "Protect your next sleep window with one earlier wind-down cue."
+      : null,
+    "Keep the next step tiny enough that it feels easy to begin.",
+  ].filter(Boolean) as string[];
 
   return (
     <div className="max-w-2xl mx-auto px-4 md:px-8 py-8 md:py-12">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2">Action Plans</h1>
-        <p className="text-muted-foreground text-sm mb-8">Practical, flexible steps. No pressure — just direction.</p>
+        <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground mb-2">
+          Action Plans
+        </h1>
+        <p className="text-muted-foreground text-sm mb-8">
+          Practical, flexible steps. No pressure — just direction.
+        </p>
 
         {!userId ? (
           <div className="rounded-lg border border-border bg-card shadow-card p-4 text-sm text-muted-foreground">
@@ -64,6 +85,19 @@ export default function PlansPage() {
             </div>
           </div>
         )}
+
+        <div className="mb-6 rounded-lg border border-border bg-card shadow-card p-5">
+          <h2 className="font-heading font-semibold text-foreground text-sm mb-3">
+            Follow-up Suggestions
+          </h2>
+          <div className="space-y-2">
+            {lightweightSuggestions.map((item, index) => (
+              <div key={index} className="rounded-md border border-border bg-background p-3">
+                <p className="text-sm text-muted-foreground">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
         <div className="pt-4 border-t border-border">
           <p className="text-xs text-muted-foreground mb-3">
