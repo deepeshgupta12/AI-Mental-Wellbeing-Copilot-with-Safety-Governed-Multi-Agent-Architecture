@@ -53,10 +53,10 @@ const steps = [
 ] as const;
 
 function buildEmailFromSelections(selections: Record<string, string | string[]>) {
-  const style = typeof selections.style === "string" ? selections.style : "reflective";
-  const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
-  const suffix = `${Date.now()}`;
-  return `${intent}-${style}-${suffix}@aether.local`;
+const style = typeof selections.style === "string" ? selections.style : "reflective";
+const intent = typeof selections.intent === "string" ? selections.intent : "wellbeing";
+const suffix = `${Date.now()}`;
+return `${intent}-${style}-${suffix}@example.com`;
 }
 
 function buildDisplayName(selections: Record<string, string | string[]>) {
