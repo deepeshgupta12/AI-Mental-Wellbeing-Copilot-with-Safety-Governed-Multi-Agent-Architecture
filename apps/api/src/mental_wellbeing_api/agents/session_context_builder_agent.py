@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 
 
@@ -28,7 +29,25 @@ def run_session_context_builder_agent(state: AgentRuntimeState) -> AgentRuntimeS
         helpful_lines = [f"- {item}" for item in what_helped_before]
         sections.append("What helped before:\n" + "\n".join(helpful_lines))
 
-    return {
+    session_context = "\n\n".join(sections)
+
+    state = {
         **state,
-        "session_context": "\n\n".join(sections),
+        "session_context": session_context,
     }
+    state = append_execution_event(
+        state,
+        node_name="session_context_builder",
+        metadata={
+            "memory_count": len(recalled_items),
+            "preference_count": len(preference_signals),
+            "helpful_before_count": len(what_helped_before),
+        },
+    )
+    state = append_handoff(
+        state,
+        from_agent="session_context_builder",
+        to_agent="input_structuring",
+        reason="context assembled for downstream structuring",
+    )
+    return state
