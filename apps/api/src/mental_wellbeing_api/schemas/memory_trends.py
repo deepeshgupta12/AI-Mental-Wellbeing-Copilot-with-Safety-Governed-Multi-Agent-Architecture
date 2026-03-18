@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MemoryItemResponse(BaseModel):
@@ -11,6 +11,8 @@ class MemoryItemResponse(BaseModel):
     title: str
     summary: str
     created_at: datetime
+    memory_kind: str | None = None
+    importance_score: float | None = None
 
 
 class MemorySummaryResponse(BaseModel):
@@ -18,6 +20,9 @@ class MemorySummaryResponse(BaseModel):
     display_name: str | None
     wellbeing_goals: str | None
     recent_memories: list[MemoryItemResponse]
+    helpful_before: list[str] = Field(default_factory=list)
+    recurring_triggers: list[str] = Field(default_factory=list)
+    preference_signals: dict[str, str] = Field(default_factory=dict)
 
 
 class TrendSummaryResponse(BaseModel):
@@ -33,3 +38,5 @@ class TrendSummaryResponse(BaseModel):
     latest_check_in_at: datetime | None
     latest_journal_entry_at: datetime | None
     latest_conversation_at: datetime | None
+    latest_snapshot_window_type: str | None = None
+    latest_snapshot_created_at: datetime | None = None

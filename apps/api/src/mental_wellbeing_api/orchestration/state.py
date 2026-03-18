@@ -9,6 +9,9 @@ class AgentRuntimeState(TypedDict, total=False):
     provider: str
 
     recalled_memories: list[str]
+    recalled_memory_items: list[dict]
+    preference_signals: dict[str, str]
+    what_helped_before: list[str]
     session_context: str
     support_strategy: str
 
