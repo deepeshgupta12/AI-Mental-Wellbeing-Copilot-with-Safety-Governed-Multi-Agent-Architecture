@@ -1,16 +1,23 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mental_wellbeing_api.models.agent_trace import AgentTrace
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
 from mental_wellbeing_api.models.user import User
 from mental_wellbeing_api.orchestration.graph import build_agent_runtime_graph
 from mental_wellbeing_api.schemas.agent_runtime import (
     AgentRuntimeSmokeRequest,
     AgentRuntimeSmokeResponse,
+    HandoffEventResponse,
+    NodeTraceEventResponse,
+    RecalledMemoryItemResponse,
 )
-from mental_wellbeing_api.services.memory_service import MemoryService
+from mental_wellbeing_api.services.memory_service import MemoryRecallItem, MemoryService
+from mental_wellbeing_api.services.preference_service import PreferenceService
 from mental_wellbeing_api.services.safety_service import (
     SafetyEvaluationResponse,
     SafetyService,
@@ -23,41 +30,172 @@ class AgentRuntimeService:
         self.session = session
         self.safety_service = SafetyService()
         self.memory_service = MemoryService(session)
+        self.preference_service = PreferenceService(session)
 
     async def evaluate_safety_only(
         self, payload: AgentRuntimeSmokeRequest
     ) -> SafetyEvaluationResponse:
         return self.safety_service.evaluate_text(payload.user_input)
 
+    async def _log_memory_trace(
+        self,
+        *,
+        user_id: str | None,
+        trace_name: str,
+        recalled_items: list[MemoryRecallItem],
+        preference_signals: dict[str, str],
+    ) -> None:
+        trace = AgentTrace(
+            user_id=user_id,
+            session_id=None,
+            message_id=None,
+            trace_name=trace_name,
+            agent_name="memory_service",
+            handoff_from_agent=None,
+            handoff_to_agent=None,
+            input_payload_json={
+                "user_id": user_id,
+                "preference_keys": list(preference_signals.keys()),
+            },
+            output_payload_json={
+                "memory_hits": [
+                    {
+                        "source_type": item.source_type,
+                        "source_id": item.source_id,
+                        "memory_kind": item.memory_kind,
+                        "content": item.content,
+                        "importance_score": item.importance_score,
+                        "relevance_score": item.relevance_score,
+                    }
+                    for item in recalled_items
+                ]
+            },
+            status="completed",
+            latency_ms=None,
+            notes="V2 retrieval trace",
+        )
+        self.session.add(trace)
+        await self.session.commit()
+
+    async def _log_execution_trace(
+        self,
+        *,
+        user_id: str | None,
+        trace_id: str,
+        result: dict,
+    ) -> None:
+        node_trace = result.get("node_trace", [])
+        handoff_history = result.get("handoff_history", [])
+
+        for event in node_trace:
+            node_name = event.get("node_name", "unknown")
+            matching_handoff = next(
+                (
+                    item
+                    for item in handoff_history
+                    if item.get("from_agent") == node_name
+                ),
+                None,
+            )
+
+            trace = AgentTrace(
+                user_id=user_id,
+                session_id=None,
+                message_id=None,
+                trace_name=trace_id,
+                agent_name=node_name,
+                handoff_from_agent=matching_handoff.get("from_agent") if matching_handoff else None,
+                handoff_to_agent=matching_handoff.get("to_agent") if matching_handoff else None,
+                input_payload_json={
+                    "routing_contract": result.get("routing_contract", {}),
+                    "intent_label": result.get("intent_label"),
+                    "support_strategy": result.get("support_strategy"),
+                },
+                output_payload_json={
+                    "status": event.get("status"),
+                    "metadata": event.get("metadata", {}),
+                },
+                status=event.get("status", "completed"),
+                latency_ms=None,
+                notes="V2 graph execution trace",
+            )
+            self.session.add(trace)
+
+        await self.session.commit()
+
     async def run_smoke_flow(
         self, payload: AgentRuntimeSmokeRequest
     ) -> AgentRuntimeSmokeResponse:
         safety_eval = self.safety_service.evaluate_text(payload.user_input)
 
-        recalled_memories: list[str] = []
+        trace_id = str(uuid4())
+        recalled_memory_items: list[MemoryRecallItem] = []
+        preference_signals: dict[str, str] = {}
+        what_helped_before: list[str] = []
+
         if payload.user_id is not None:
-            user_exists = await self.session.scalar(
-                select(User.id).where(User.id == str(payload.user_id))
-            )
+            user_id = str(payload.user_id)
+            user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
             if user_exists:
-                recalled_memories = await self.memory_service.recall(
-                    user_id=str(payload.user_id),
+                preference_signals = await self.preference_service.get_preference_signals(user_id)
+
+                recalled_memory_items = await self.memory_service.recall(
+                    user_id=user_id,
                     query=payload.user_input,
-                    limit=3,
+                    limit=4,
+                )
+
+                what_helped_before = await self.memory_service.recall_texts(
+                    user_id=user_id,
+                    query=payload.user_input,
+                    limit=2,
+                    memory_kinds=["helpful_strategy", "preference"],
+                )
+
+                await self._log_memory_trace(
+                    user_id=user_id,
+                    trace_name="memory_retrieval",
+                    recalled_items=recalled_memory_items,
+                    preference_signals=preference_signals,
                 )
 
         result = self.graph.invoke(
             {
+                "trace_id": trace_id,
                 "user_id": str(payload.user_id) if payload.user_id else "",
                 "user_input": payload.user_input,
                 "provider": payload.provider,
-                "recalled_memories": recalled_memories,
+                "execution_path": [],
+                "node_trace": [],
+                "handoff_history": [],
+                "recalled_memories": [item.content for item in recalled_memory_items],
+                "recalled_memory_items": [
+                    {
+                        "source_type": item.source_type,
+                        "source_id": item.source_id,
+                        "memory_kind": item.memory_kind,
+                        "content": item.content,
+                        "importance_score": item.importance_score,
+                        "relevance_score": item.relevance_score,
+                        "created_at": item.created_at.isoformat() if item.created_at else None,
+                    }
+                    for item in recalled_memory_items
+                ],
+                "preference_signals": preference_signals,
+                "what_helped_before": what_helped_before,
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
                 "safety_override": safety_eval.safety_override,
             }
         )
+
+        if payload.user_id is not None:
+            await self._log_execution_trace(
+                user_id=str(payload.user_id),
+                trace_id=trace_id,
+                result=result,
+            )
 
         if (
             payload.user_id is not None
@@ -88,4 +226,45 @@ class AgentRuntimeService:
             safety_flag_type=result.get("safety_flag_type"),
             safety_summary=result.get("safety_summary"),
             safety_override=bool(result.get("safety_override", False)),
+            intent_label=result.get("intent_label"),
+            support_strategy=result.get("support_strategy"),
+            specialist_agent=result.get("specialist_agent"),
+            routing_reason=result.get("routing_reason"),
+            routing_contract=result.get("routing_contract", {}),
+            session_context=result.get("session_context"),
+            preference_signals=preference_signals,
+            what_helped_before=what_helped_before,
+            memory_hits=[
+                RecalledMemoryItemResponse(
+                    source_type=item.source_type,
+                    source_id=item.source_id,
+                    memory_kind=item.memory_kind,
+                    content=item.content,
+                    importance_score=item.importance_score,
+                    relevance_score=item.relevance_score,
+                    created_at=item.created_at.isoformat() if item.created_at else None,
+                )
+                for item in recalled_memory_items
+            ],
+            execution_path=result.get("execution_path", []),
+            node_trace=[
+                NodeTraceEventResponse(
+                    node_name=item.get("node_name", ""),
+                    status=item.get("status", "completed"),
+                    timestamp=item.get("timestamp"),
+                    metadata=item.get("metadata", {}),
+                )
+                for item in result.get("node_trace", [])
+            ],
+            handoff_history=[
+                HandoffEventResponse(
+                    from_agent=item.get("from_agent", ""),
+                    to_agent=item.get("to_agent", ""),
+                    reason=item.get("reason", ""),
+                    timestamp=item.get("timestamp"),
+                    contract=item.get("contract", {}),
+                )
+                for item in result.get("handoff_history", [])
+            ],
+            execution_summary=result.get("execution_summary"),
         )

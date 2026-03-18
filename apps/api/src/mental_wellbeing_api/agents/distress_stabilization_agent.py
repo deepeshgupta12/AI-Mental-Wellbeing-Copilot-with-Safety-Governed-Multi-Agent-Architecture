@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
@@ -24,7 +25,19 @@ Keep the response brief, gentle, and concrete.
     )
     reflective_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
 
-    return {
+    state = {
         **state,
         "reflective_response": reflective_response,
     }
+    state = append_execution_event(
+        state,
+        node_name="distress_stabilization",
+        metadata={"response_length": len(reflective_response)},
+    )
+    state = append_handoff(
+        state,
+        from_agent="distress_stabilization",
+        to_agent="response_composer",
+        reason="stabilization draft prepared",
+    )
+    return state

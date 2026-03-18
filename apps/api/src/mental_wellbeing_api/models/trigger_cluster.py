@@ -3,15 +3,15 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from mental_wellbeing_api.db.base import Base
 
 
-class ActionPlan(Base):
-    __tablename__ = "action_plans"
+class TriggerCluster(Base):
+    __tablename__ = "trigger_clusters"
 
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
@@ -24,13 +24,10 @@ class ActionPlan(Base):
         index=True,
         nullable=False,
     )
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    timeframe: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    plan_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    source: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    recommendation_context_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    is_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    cluster_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    trigger_text: Mapped[str] = mapped_column(Text, nullable=False)
+    frequency: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

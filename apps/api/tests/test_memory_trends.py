@@ -78,6 +78,11 @@ def test_memory_and_trend_basics() -> None:
         memory_payload = memory_response.json()
         assert memory_payload["user_id"] == user_id
         assert len(memory_payload["recent_memories"]) >= 3
+        assert "helpful_before" in memory_payload
+        assert "recurring_triggers" in memory_payload
+        assert "preference_signals" in memory_payload
+        assert memory_payload["preference_signals"]["support_style"] == "calm"
+        assert any("memory_kind" in item for item in memory_payload["recent_memories"])
 
         trend_response = client.get(
             f"/api/v1/memory-trends/trend-summary?user_id={user_id}"
@@ -89,3 +94,5 @@ def test_memory_and_trend_basics() -> None:
         assert trend_payload["total_journal_entries"] == 1
         assert trend_payload["total_conversation_sessions"] == 1
         assert trend_payload["total_conversation_messages"] == 1
+        assert "latest_snapshot_window_type" in trend_payload
+        assert "latest_snapshot_created_at" in trend_payload

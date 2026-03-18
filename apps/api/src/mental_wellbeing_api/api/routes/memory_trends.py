@@ -11,12 +11,16 @@ from mental_wellbeing_api.api.deps import db_session_dep
 from mental_wellbeing_api.models.check_in import CheckIn
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.models.journal_entry import JournalEntry
+from mental_wellbeing_api.models.memory_chunk import MemoryChunk
+from mental_wellbeing_api.models.trend_snapshot import TrendSnapshot
+from mental_wellbeing_api.models.trigger_cluster import TriggerCluster
 from mental_wellbeing_api.models.user import User
 from mental_wellbeing_api.schemas.memory_trends import (
     MemoryItemResponse,
     MemorySummaryResponse,
     TrendSummaryResponse,
 )
+from mental_wellbeing_api.services.preference_service import PreferenceService
 
 router = APIRouter(prefix="/memory-trends", tags=["memory-trends"])
 
@@ -82,6 +86,41 @@ async def get_memory_summary(
         ).all()
     )
 
+    recent_memory_chunks = list(
+        (
+            await session.scalars(
+                select(MemoryChunk)
+                .where(MemoryChunk.user_id == str(user_id))
+                .order_by(MemoryChunk.created_at.desc())
+                .limit(20)
+            )
+        ).all()
+    )
+
+    helpful_before = [
+        _truncate(item.content, 120)
+        for item in recent_memory_chunks
+        if item.memory_kind == "helpful_strategy"
+    ][:3]
+
+    recurring_triggers = [
+        item.cluster_name
+        for item in (
+            await session.scalars(
+                select(TriggerCluster)
+                .where(TriggerCluster.user_id == str(user_id))
+                .order_by(TriggerCluster.frequency.desc(), TriggerCluster.updated_at.desc())
+                .limit(5)
+            )
+        ).all()
+    ]
+
+    preference_signals = await PreferenceService(session).get_preference_signals(str(user_id))
+
+    chunk_lookup: dict[tuple[str, str], MemoryChunk] = {
+        (item.source_type, item.source_id): item for item in recent_memory_chunks
+    }
+
     memory_items: list[MemoryItemResponse] = []
 
     for item in recent_check_ins:
@@ -97,6 +136,7 @@ async def get_memory_summary(
         if item.notes:
             summary_parts.append(_truncate(item.notes, 80))
 
+        linked_chunk = chunk_lookup.get(("check_in", item.id))
         memory_items.append(
             MemoryItemResponse(
                 source_type="check_in",
@@ -104,17 +144,22 @@ async def get_memory_summary(
                 title="Check-in snapshot",
                 summary=" • ".join(summary_parts) if summary_parts else "Recent check-in recorded",
                 created_at=item.created_at,
+                memory_kind=linked_chunk.memory_kind if linked_chunk else None,
+                importance_score=linked_chunk.importance_score if linked_chunk else None,
             )
         )
 
     for item in recent_journals:
+        linked_chunk = chunk_lookup.get(("journal_entry", item.id))
         memory_items.append(
             MemoryItemResponse(
                 source_type="journal_entry",
                 source_id=item.id,
                 title=item.title or "Journal entry",
-                summary=_truncate(item.content, 140),
+                summary=_truncate(item.summary or item.content, 140),
                 created_at=item.created_at,
+                memory_kind=linked_chunk.memory_kind if linked_chunk else None,
+                importance_score=linked_chunk.importance_score if linked_chunk else None,
             )
         )
 
@@ -124,8 +169,10 @@ async def get_memory_summary(
                 source_type="conversation_session",
                 source_id=item.id,
                 title=item.title or "Conversation session",
-                summary=f"Status: {item.status}",
+                summary=item.session_summary or f"Status: {item.status}",
                 created_at=item.updated_at,
+                memory_kind="episodic",
+                importance_score=None,
             )
         )
 
@@ -137,6 +184,9 @@ async def get_memory_summary(
         display_name=user.profile.display_name if user.profile else None,
         wellbeing_goals=user.profile.wellbeing_goals if user.profile else None,
         recent_memories=memory_items,
+        helpful_before=helpful_before,
+        recurring_triggers=recurring_triggers,
+        preference_signals=preference_signals,
     )
 
 
@@ -192,6 +242,13 @@ async def get_trend_summary(
         )
     ).one()
 
+    latest_snapshot = await session.scalar(
+        select(TrendSnapshot)
+        .where(TrendSnapshot.user_id == str(user_id))
+        .order_by(TrendSnapshot.created_at.desc())
+        .limit(1)
+    )
+
     return TrendSummaryResponse(
         user_id=str(user_id),
         total_check_ins=int(check_in_stats[0] or 0),
@@ -205,4 +262,6 @@ async def get_trend_summary(
         total_conversation_sessions=int(session_stats[0] or 0),
         latest_conversation_at=session_stats[1],
         total_conversation_messages=int(message_stats[0] or 0),
+        latest_snapshot_window_type=latest_snapshot.window_type if latest_snapshot else None,
+        latest_snapshot_created_at=latest_snapshot.created_at if latest_snapshot else None,
     )

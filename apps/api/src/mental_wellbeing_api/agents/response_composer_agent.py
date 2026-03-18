@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
@@ -13,11 +14,23 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             "or a crisis helpline right now, and reach out to a trusted person who can be with you. "
             "If you're not in immediate danger, tell me whether you want help taking the next safe step right now."
         )
-        return {
+        state = {
             **state,
             "reflective_response": state.get("reflective_response", ""),
             "final_response": final_response,
         }
+        state = append_execution_event(
+            state,
+            node_name="response_composer",
+            metadata={"mode": "safety_override", "response_length": len(final_response)},
+        )
+        state = append_handoff(
+            state,
+            from_agent="response_composer",
+            to_agent="policy_guardrail",
+            reason="safe redirect response prepared",
+        )
+        return state
 
     llm = LLMService()
     system_prompt = load_prompt(
@@ -32,13 +45,26 @@ Keep it concise, calm, and supportive.
         f"User input:\n{state['user_input']}\n\n"
         f"Session context:\n{state.get('session_context', '')}\n\n"
         f"Structured summary:\n{state.get('structured_input', '')}\n\n"
+        f"Intent label:\n{state.get('intent_label', 'general_reflection')}\n\n"
         f"Support strategy:\n{state.get('support_strategy', 'reflective')}\n\n"
         f"Draft response:\n{state.get('reflective_response', '')}\n\n"
         "Compose the final response."
     )
     final_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
 
-    return {
+    state = {
         **state,
         "final_response": final_response,
     }
+    state = append_execution_event(
+        state,
+        node_name="response_composer",
+        metadata={"mode": "standard", "response_length": len(final_response)},
+    )
+    state = append_handoff(
+        state,
+        from_agent="response_composer",
+        to_agent="policy_guardrail",
+        reason="final response composed",
+    )
+    return state
