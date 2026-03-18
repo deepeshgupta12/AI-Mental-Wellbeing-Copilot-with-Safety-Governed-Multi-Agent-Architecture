@@ -14,10 +14,9 @@ memory:
   fallback_to_recency: true
 
 routing:
-  contract_name: v2-specialist-routing
+  contract_name: v2-routing-core
   default_intent: general_reflection
   default_strategy: reflective
-  default_support_mode: reflect
   medium_risk_strategy: distress_stabilization
   direct_style_action_bias: true
   behavioral_activation_hints:

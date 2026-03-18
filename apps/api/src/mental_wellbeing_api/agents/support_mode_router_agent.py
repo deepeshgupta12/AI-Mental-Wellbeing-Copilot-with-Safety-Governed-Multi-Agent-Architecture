@@ -88,7 +88,7 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
     }
     state = set_routing_contract(
         state,
-        contract_name="v2-specialist-routing",
+        contract_name="v2-routing-core",
         intent_label=intent_label,
         support_strategy=support_strategy,
         specialist_agent=specialist_agent,
