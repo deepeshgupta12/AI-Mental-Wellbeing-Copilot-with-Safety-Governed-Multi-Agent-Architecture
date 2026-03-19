@@ -12,6 +12,9 @@ from mental_wellbeing_api.agents.distress_stabilization_agent import (
 from mental_wellbeing_api.agents.execution_finalize_agent import (
     run_execution_finalize_agent,
 )
+from mental_wellbeing_api.agents.follow_up_planner_agent import (
+    run_follow_up_planner_agent,
+)
 from mental_wellbeing_api.agents.habit_care_plan_agent import run_habit_care_plan_agent
 from mental_wellbeing_api.agents.input_structuring_agent import (
     run_input_structuring_agent,
@@ -94,6 +97,7 @@ def build_agent_runtime_graph():
 
     graph.add_node("trend_analyzer", run_trend_analyzer_agent)
     graph.add_node("preference_learning", run_preference_learning_agent)
+    graph.add_node("follow_up_planner", run_follow_up_planner_agent)
     graph.add_node("response_composer", run_response_composer_agent)
     graph.add_node("policy_guardrail", run_policy_guardrail_agent)
     graph.add_node("execution_finalize", run_execution_finalize_agent)
@@ -139,7 +143,8 @@ def build_agent_runtime_graph():
     graph.add_edge("habit_care_plan", "trend_analyzer")
 
     graph.add_edge("trend_analyzer", "preference_learning")
-    graph.add_edge("preference_learning", "response_composer")
+    graph.add_edge("preference_learning", "follow_up_planner")
+    graph.add_edge("follow_up_planner", "response_composer")
     graph.add_edge("response_composer", "policy_guardrail")
     graph.add_edge("policy_guardrail", "execution_finalize")
     graph.add_edge("execution_finalize", END)

@@ -131,48 +131,15 @@ class AgentRuntimeService:
 
         await self.session.commit()
 
-    def _should_create_follow_up_plan(
-        self,
-        *,
-        user_id: str | None,
-        safety_override: bool,
-        follow_up_suggestions: list[str],
-    ) -> bool:
-        return bool(user_id and not safety_override and follow_up_suggestions)
-
-    def _resolve_follow_up_plan_type(self, result: dict) -> str:
-        support_mode = (result.get("support_mode") or "").strip().lower()
-        support_strategy = (result.get("support_strategy") or "").strip().lower()
-
-        if support_mode:
-            return support_mode
-        if support_strategy:
-            return support_strategy
-        return "general_follow_up"
-
-    def _resolve_follow_up_title(self, result: dict) -> str:
-        support_mode = (result.get("support_mode") or "").strip().lower()
-
-        title_map = {
-            "plan": "Check in on your plan",
-            "recover": "Check in on your recovery",
-            "reflect": "Continue this reflection",
-            "connect": "Follow up on reaching out",
-            "reframe": "Revisit this reframe",
-            "activate": "Restart with one small step",
-            "stabilize": "Follow up on stabilization",
+    def _build_follow_up_plan_preview(self, result: dict) -> dict:
+        return {
+            "plan_type": result.get("follow_up_plan_type"),
+            "title": result.get("follow_up_plan_title"),
+            "description": result.get("follow_up_plan_description"),
+            "scheduled_for": result.get("follow_up_due_at"),
+            "delivery_channel": result.get("follow_up_delivery_channel"),
+            "status": result.get("follow_up_status"),
         }
-        return title_map.get(support_mode, "Continue this support plan")
-
-    def _resolve_follow_up_description(self, result: dict) -> str | None:
-        follow_up_suggestions = result.get("follow_up_suggestions", [])
-        if follow_up_suggestions:
-            return str(follow_up_suggestions[0])
-
-        support_strategy = result.get("support_strategy")
-        if support_strategy:
-            return f"Follow up on the {support_strategy} support plan."
-        return "Check in on the next small step from this support session."
 
     async def run_smoke_flow(
         self,
@@ -186,6 +153,7 @@ class AgentRuntimeService:
         what_helped_before: list[str] = []
         trend_bundle: dict = {}
         generated_follow_up_plan = None
+        follow_up_event_ids: list[str] = []
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
@@ -193,29 +161,29 @@ class AgentRuntimeService:
             if user_exists:
                 preference_signals = await self.preference_service.get_preference_signals(user_id)
 
-                recalled_memory_items = await self.memory_service.recall(
-                    user_id=user_id,
-                    query=payload.user_input,
-                    limit=4,
-                    preference_signals=preference_signals,
-                )
+            recalled_memory_items = await self.memory_service.recall(
+                user_id=user_id,
+                query=payload.user_input,
+                limit=4,
+                preference_signals=preference_signals,
+            )
 
-                what_helped_before = await self.memory_service.recall_texts(
-                    user_id=user_id,
-                    query=payload.user_input,
-                    limit=2,
-                    memory_kinds=["helpful_strategy", "preference"],
-                    preference_signals=preference_signals,
-                )
+            what_helped_before = await self.memory_service.recall_texts(
+                user_id=user_id,
+                query=payload.user_input,
+                limit=2,
+                memory_kinds=["helpful_strategy", "preference"],
+                preference_signals=preference_signals,
+            )
 
-                trend_bundle = await self.trend_service.build_runtime_trend_bundle(user_id=user_id)
+            trend_bundle = await self.trend_service.build_runtime_trend_bundle(user_id=user_id)
 
-                await self._log_memory_trace(
-                    user_id=user_id,
-                    trace_name="memory_retrieval",
-                    recalled_items=recalled_memory_items,
-                    preference_signals=preference_signals,
-                )
+            await self._log_memory_trace(
+                user_id=user_id,
+                trace_name="memory_retrieval",
+                recalled_items=recalled_memory_items,
+                preference_signals=preference_signals,
+            )
 
         result = self.graph.invoke(
             {
@@ -251,6 +219,18 @@ class AgentRuntimeService:
                 "recurring_patterns": trend_bundle.get("recurring_patterns", []),
                 "intervention_effectiveness": trend_bundle.get("intervention_effectiveness", {}),
                 "trend_visualization": trend_bundle.get("trend_visualization", {}),
+                "follow_up_required": False,
+                "follow_up_plan_type": None,
+                "follow_up_plan_title": None,
+                "follow_up_plan_description": None,
+                "follow_up_due_at": None,
+                "follow_up_delivery_channel": None,
+                "follow_up_status": None,
+                "follow_up_contract": {},
+                "follow_up_plan_id": None,
+                "follow_up_event_ids": [],
+                "temporal_contract": {},
+                "scheduler_backend": None,
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
@@ -273,21 +253,16 @@ class AgentRuntimeService:
             )
             preference_signals = await self.preference_service.get_preference_signals(user_id)
 
-            follow_up_suggestions = result.get("follow_up_suggestions", [])
-            if self._should_create_follow_up_plan(
-                user_id=user_id,
-                safety_override=bool(result.get("safety_override", False)),
-                follow_up_suggestions=follow_up_suggestions,
-            ):
+            if bool(result.get("follow_up_required")) and not bool(result.get("safety_override", False)):
                 created_plan = await self.follow_up_service.create_plan(
                     user_id=user_id,
                     source_agent=result.get("specialist_agent") or "response_composer",
-                    plan_type=self._resolve_follow_up_plan_type(result),
-                    title=self._resolve_follow_up_title(result),
-                    description=self._resolve_follow_up_description(result),
+                    plan_type=result.get("follow_up_plan_type") or "general_follow_up",
+                    title=result.get("follow_up_plan_title") or "Continue this support plan",
+                    description=result.get("follow_up_plan_description"),
                     session_id=None,
                     action_plan_id=None,
-                    delivery_channel="in_app",
+                    delivery_channel=result.get("follow_up_delivery_channel") or "in_app",
                     timezone_name=preference_signals.get("timezone"),
                     support_mode=result.get("support_mode"),
                     support_strategy=result.get("support_strategy"),
@@ -295,10 +270,27 @@ class AgentRuntimeService:
                     metadata={
                         "trace_id": trace_id,
                         "routing_contract": result.get("routing_contract", {}),
-                        "follow_up_suggestions": follow_up_suggestions[:3],
+                        "follow_up_contract": result.get("follow_up_contract", {}),
+                        "temporal_contract": result.get("temporal_contract", {}),
+                        "scheduler_backend": result.get("scheduler_backend"),
+                        "follow_up_suggestions": result.get("follow_up_suggestions", [])[:3],
                     },
                 )
                 generated_follow_up_plan = FollowUpPlanResponse.model_validate(created_plan)
+
+                created_event = await self.follow_up_service.create_event(
+                    follow_up_plan_id=created_plan.id,
+                    user_id=user_id,
+                    event_type="scheduled",
+                    outcome_status="planned",
+                    notes="Runtime-generated follow up plan scheduled.",
+                    event_payload_json={
+                        "scheduler_backend": result.get("scheduler_backend"),
+                        "follow_up_due_at": result.get("follow_up_due_at"),
+                        "temporal_contract": result.get("temporal_contract", {}),
+                    },
+                )
+                follow_up_event_ids = [created_event.id]
 
         if (
             payload.user_id is not None
@@ -352,6 +344,13 @@ class AgentRuntimeService:
             recurring_patterns=result.get("recurring_patterns", []),
             intervention_effectiveness=result.get("intervention_effectiveness", {}),
             trend_visualization=result.get("trend_visualization", {}),
+            follow_up_required=bool(result.get("follow_up_required", False)),
+            follow_up_plan=self._build_follow_up_plan_preview(result),
+            follow_up_contract=result.get("follow_up_contract", {}),
+            follow_up_plan_id=generated_follow_up_plan.id if generated_follow_up_plan else result.get("follow_up_plan_id"),
+            follow_up_event_ids=follow_up_event_ids or result.get("follow_up_event_ids", []),
+            temporal_contract=result.get("temporal_contract", {}),
+            scheduler_backend=result.get("scheduler_backend"),
             generated_follow_up_plan=generated_follow_up_plan,
             memory_hits=[
                 RecalledMemoryItemResponse(
