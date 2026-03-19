@@ -35,9 +35,15 @@ def test_agent_runtime_smoke() -> None:
     assert "support_progress_summary" in payload
     assert "recurring_patterns" in payload
     assert "intervention_effectiveness" in payload
+    assert "generated_follow_up_plan" in payload
+    assert "follow_up_required" in payload
+    assert "follow_up_plan" in payload
+    assert "follow_up_contract" in payload
+    assert "temporal_contract" in payload
+    assert "scheduler_backend" in payload
 
 
-def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> None:
+def test_agent_runtime_returns_memory_hits_preferences_and_generated_follow_up_for_known_user() -> None:
     unique_email = f"runtime-{uuid4()}@example.com"
 
     with TestClient(app) as client:
@@ -96,3 +102,11 @@ def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> N
         assert "support_progress_summary" in payload
         assert "recurring_patterns" in payload
         assert "intervention_effectiveness" in payload
+        assert payload["generated_follow_up_plan"] is not None
+        assert payload["generated_follow_up_plan"]["user_id"] == user_id
+        assert payload["generated_follow_up_plan"]["source_agent"] == payload["specialist_agent"]
+        assert payload["follow_up_required"] is True
+        assert payload["follow_up_plan"]["plan_type"] is not None
+        assert payload["follow_up_contract"]["contract_version"] == "v2-followup-basic"
+        assert payload["temporal_contract"]["contract_version"] == "v2-temporal-ready"
+        assert payload["scheduler_backend"] == "local_contract"

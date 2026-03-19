@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
     ollama_default_model: str = Field(default="llama3.2", alias="OLLAMA_DEFAULT_MODEL")
 
+    scheduler_backend: str = Field(default="local_contract", alias="SCHEDULER_BACKEND")
+    temporal_enabled: bool = Field(default=False, alias="TEMPORAL_ENABLED")
+    temporal_namespace: str = Field(default="default", alias="TEMPORAL_NAMESPACE")
+    temporal_task_queue: str = Field(
+        default="mental-wellbeing-followups",
+        alias="TEMPORAL_TASK_QUEUE",
+    )
+
     cors_allow_origins: str = Field(
         default=(
             "http://localhost:3000,"

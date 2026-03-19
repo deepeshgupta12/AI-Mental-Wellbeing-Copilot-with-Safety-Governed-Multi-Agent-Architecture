@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
+
 
 class AgentRuntimeSmokeRequest(BaseModel):
     user_input: str = Field(min_length=1, max_length=4000)
@@ -67,12 +69,23 @@ class AgentRuntimeSmokeResponse(BaseModel):
     coping_recommendations: list[str] = Field(default_factory=list)
     journaling_insights: list[str] = Field(default_factory=list)
     follow_up_suggestions: list[str] = Field(default_factory=list)
+
     progress_summary: str | None = None
     support_progress_summary: str | None = None
     trend_summary: str | None = None
     recurring_patterns: list[str] = Field(default_factory=list)
     intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
     trend_visualization: dict[str, Any] = Field(default_factory=dict)
+
+    follow_up_required: bool = False
+    follow_up_plan: dict[str, Any] = Field(default_factory=dict)
+    follow_up_contract: dict[str, Any] = Field(default_factory=dict)
+    follow_up_plan_id: str | None = None
+    follow_up_event_ids: list[str] = Field(default_factory=list)
+    temporal_contract: dict[str, Any] = Field(default_factory=dict)
+    scheduler_backend: str | None = None
+
+    generated_follow_up_plan: FollowUpPlanResponse | None = None
     memory_hits: list[RecalledMemoryItemResponse] = Field(default_factory=list)
 
     execution_path: list[str] = Field(default_factory=list)

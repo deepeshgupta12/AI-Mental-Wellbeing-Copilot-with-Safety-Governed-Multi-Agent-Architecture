@@ -50,6 +50,19 @@ class AgentRuntimeState(TypedDict, total=False):
     intervention_effectiveness: dict[str, Any]
     trend_visualization: dict[str, Any]
 
+    follow_up_required: bool
+    follow_up_plan_type: str | None
+    follow_up_plan_title: str | None
+    follow_up_plan_description: str | None
+    follow_up_due_at: str | None
+    follow_up_delivery_channel: str | None
+    follow_up_status: str | None
+    follow_up_contract: dict[str, Any]
+    follow_up_plan_id: str | None
+    follow_up_event_ids: list[str]
+    temporal_contract: dict[str, Any]
+    scheduler_backend: str | None
+
     risk_level: str
     safety_flag_type: str
     safety_summary: str
