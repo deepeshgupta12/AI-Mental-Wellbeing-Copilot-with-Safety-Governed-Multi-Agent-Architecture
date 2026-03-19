@@ -187,6 +187,10 @@ export type TrendSummary = {
   recurring_patterns?: string[];
   intervention_effectiveness?: Record<string, unknown>;
   trend_visualization?: Record<string, unknown>;
+  trend_series: {
+    mood_series: TrendSeriesPoint[];
+    trigger_frequency: TriggerFrequencyPoint[];
+  };
 };
 
 export type SafetyFlag = {
@@ -291,6 +295,7 @@ export type AgentRuntimeSmokePayload = {
   user_input: string;
   provider?: "openai" | "ollama" | "mock";
   user_id?: string | null;
+  support_track?: string | null;
 };
 
 export type AgentRuntimeSmokeResponse = {
@@ -304,6 +309,7 @@ export type AgentRuntimeSmokeResponse = {
   safety_flag_type?: string | null;
   safety_summary?: string | null;
   safety_override: boolean;
+  support_track?: string | null;
 
   tone_label?: string | null;
   emotion_label?: string | null;
@@ -506,4 +512,24 @@ export type AdminAuditItem = {
   details: string;
   user_id: string | null;
   occurred_at: string;
+};
+
+export type SupportTrack = {
+  id: string;
+  title: string;
+  description: string;
+  suggested_prompt: string;
+};
+
+export type TrendSeriesPoint = {
+  timestamp: string;
+  mood_score: number | null;
+  stress_score: number | null;
+  energy_score: number | null;
+  sleep_hours: number | null;
+};
+
+export type TriggerFrequencyPoint = {
+  trigger: string;
+  frequency: number;
 };

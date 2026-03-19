@@ -21,6 +21,12 @@ import { listActionPlans } from "@/lib/action-plans-api";
 import { getCurrentUserDisplayName, getCurrentUserId } from "@/lib/demo-session";
 import { getMemorySummary, getTrendSummary } from "@/lib/memory-api";
 import { getSafetyDashboardCounts } from "@/lib/safety-api";
+import { listSupportTracks } from "@/lib/support-tracks-api";
+
+const supportTracksQuery = useQuery({
+    queryKey: ["support-tracks"],
+    queryFn: listSupportTracks,
+  });
 
 const fadeIn = {
   hidden: { opacity: 0, y: 10 },
@@ -242,6 +248,28 @@ export default function DashboardPage() {
                   </Link>
                 </>
               )}
+            </motion.div>
+
+            <motion.div
+              variants={fadeIn}
+              custom={1.5}
+              className="mb-6 rounded-lg border border-border bg-card p-6 shadow-card"
+            >
+              <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
+                Support Tracks
+              </h2>
+              <div className="grid gap-3 md:grid-cols-2">
+                {(supportTracksQuery.data ?? []).map((track) => (
+                  <Link
+                    key={track.id}
+                    href={`/app/chat?track=${encodeURIComponent(track.id)}`}
+                    className="rounded-md border border-border p-4 transition-aether hover:bg-muted"
+                  >
+                    <p className="text-sm font-medium text-foreground">{track.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{track.description}</p>
+                  </Link>
+                ))}
+              </div>
             </motion.div>
 
             <motion.div variants={fadeIn} custom={5} className="border-t border-border pt-4">
