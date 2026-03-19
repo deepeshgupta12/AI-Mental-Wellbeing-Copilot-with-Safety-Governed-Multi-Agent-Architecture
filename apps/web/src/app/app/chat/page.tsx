@@ -1,9 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Lightbulb, ListChecks, Send, Sparkles, Wind } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/api-client";
@@ -18,19 +19,7 @@ import {
   getCurrentUserId,
   setCurrentConversationSessionId,
 } from "@/lib/demo-session";
-
-import { useSearchParams } from "next/navigation";
 import { listSupportTracks } from "@/lib/support-tracks-api";
-
-const searchParams = useSearchParams();
-const initialTrack = searchParams.get("track");
-
-const supportTracksQuery = useQuery({
-    queryKey: ["support-tracks"],
-    queryFn: listSupportTracks,
-  });
-
-const [supportTrack, setSupportTrack] = useState<string | null>(initialTrack);
 
 type LocalMode = "reflective" | "calming" | "problem-solving" | "planning";
 
@@ -47,17 +36,27 @@ const suggestedPrompts = [
   "I'm feeling low today — what can I try?",
 ];
 
-export default function ChatPage() {
-  const userId = getCurrentUserId();
+function ChatPageContent() {
+  const searchParams = useSearchParams();
+
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [currentMode, setCurrentMode] = useState<LocalMode>("reflective");
-  const [sessionId, setSessionId] = useState<string | null>(getCurrentConversationSessionId());
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [supportTrack, setSupportTrack] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const supportTracksQuery = useQuery({
+    queryKey: ["support-tracks"],
+    queryFn: listSupportTracks,
+    enabled: isHydrated,
+  });
 
   const messagesQuery = useQuery({
     queryKey: ["conversation-messages", sessionId],
     queryFn: () => listConversationMessages(sessionId!),
-    enabled: !!sessionId,
+    enabled: isHydrated && !!sessionId,
   });
 
   const createSessionMutation = useMutation({
@@ -74,10 +73,26 @@ export default function ChatPage() {
   });
 
   useEffect(() => {
+    setIsHydrated(true);
+    setUserId(getCurrentUserId());
+    setSessionId(getCurrentConversationSessionId());
+    setSupportTrack(searchParams.get("track"));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
+    const nextTrack = searchParams.get("track");
+    if (nextTrack) {
+      setSupportTrack(nextTrack);
+    }
+  }, [isHydrated, searchParams]);
+
+  useEffect(() => {
+    if (!isHydrated) return;
     if (userId && !sessionId && !createSessionMutation.isPending) {
       createSessionMutation.mutate();
     }
-  }, [userId, sessionId, createSessionMutation]);
+  }, [isHydrated, userId, sessionId, createSessionMutation]);
 
   const sendFlowMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -127,21 +142,26 @@ export default function ChatPage() {
   const messages = messagesQuery.data ?? [];
 
   return (
-    <><div className="shrink-0 border-b border-border bg-background px-4 py-2 md:px-6">
-      <div className="mx-auto flex max-w-2xl gap-2 overflow-x-auto">
-        {(supportTracksQuery.data ?? []).map((track) => (
-          <button
-            key={track.id}
-            onClick={() => setSupportTrack(track.id)}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-aether ${supportTrack === track.id
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:bg-muted"}`}
-          >
-            {track.title}
-          </button>
-        ))}
+    <>
+      <div className="shrink-0 border-b border-border bg-background px-4 py-2 md:px-6">
+        <div className="mx-auto flex max-w-2xl gap-2 overflow-x-auto">
+          {(supportTracksQuery.data ?? []).map((track) => (
+            <button
+              key={track.id}
+              onClick={() => setSupportTrack(track.id)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition-aether ${
+                supportTrack === track.id
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {track.title}
+            </button>
+          ))}
+        </div>
       </div>
-    </div><div className="flex h-[calc(100svh-3.5rem)] flex-col md:h-svh">
+
+      <div className="flex h-[calc(100svh-3.5rem)] flex-col md:h-svh">
         <div className="shrink-0 border-b border-border bg-background px-4 py-3 md:px-6">
           <div className="flex items-center justify-between">
             <div>
@@ -155,14 +175,17 @@ export default function ChatPage() {
                 </span>
               </div>
             </div>
+
             <div className="flex gap-1">
               {modeLabels.map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => setCurrentMode(mode.id)}
-                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-aether ${currentMode === mode.id
+                  className={`rounded px-2.5 py-1 text-[11px] font-medium transition-aether ${
+                    currentMode === mode.id
                       ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted"}`}
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
                 >
                   {mode.label}
                 </button>
@@ -173,7 +196,11 @@ export default function ChatPage() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl space-y-1 px-4 py-6 md:px-6">
-            {!userId ? (
+            {!isHydrated ? (
+              <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+                Loading conversation...
+              </div>
+            ) : !userId ? (
               <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
                 No active user session found. Please complete onboarding first.
               </div>
@@ -193,9 +220,11 @@ export default function ChatPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${msg.role === "assistant"
+                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                          msg.role === "assistant"
                             ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground"}`}
+                            : "bg-secondary text-secondary-foreground"
+                        }`}
                       >
                         {msg.role === "assistant" ? "A" : "Y"}
                       </div>
@@ -242,11 +271,12 @@ export default function ChatPage() {
                   e.preventDefault();
                   handleSend();
                 }
-              } }
+              }}
               placeholder="What's on your mind?"
               rows={1}
               className="min-h-[42px] max-h-[160px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              style={{ fieldSizing: "content" } as React.CSSProperties} />
+              style={{ fieldSizing: "content" } as React.CSSProperties}
+            />
             <Button
               onClick={handleSend}
               variant="hero"
@@ -258,6 +288,23 @@ export default function ChatPage() {
             </Button>
           </div>
         </div>
-      </div></>
+      </div>
+    </>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
+          <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground shadow-card">
+            Loading conversation...
+          </div>
+        </div>
+      }
+    >
+      <ChatPageContent />
+    </Suspense>
   );
 }
