@@ -22,7 +22,12 @@ Keep the output brief, neutral, and useful for downstream routing.
         f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
         "Return a concise structured summary."
     )
-    structured_input = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    structured_input = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="input_structuring",
+    )
 
     state = {
         **state,

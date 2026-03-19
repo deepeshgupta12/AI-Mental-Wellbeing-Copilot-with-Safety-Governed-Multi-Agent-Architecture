@@ -118,6 +118,7 @@ class AgentRuntimeService:
                     "support_strategy": result.get("support_strategy"),
                     "support_mode": result.get("support_mode"),
                     "specialist_agent": result.get("specialist_agent"),
+                    "support_track": result.get("support_track"),
                 },
                 output_payload_json={
                     "status": event.get("status"),
@@ -154,9 +155,6 @@ class AgentRuntimeService:
         trend_bundle: dict = {}
         generated_follow_up_plan = None
         follow_up_event_ids: list[str] = []
-        resolved_follow_up_contract: dict = {}
-        resolved_temporal_contract: dict = {}
-        resolved_scheduler_backend: str | None = None
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
@@ -164,29 +162,29 @@ class AgentRuntimeService:
             if user_exists:
                 preference_signals = await self.preference_service.get_preference_signals(user_id)
 
-            recalled_memory_items = await self.memory_service.recall(
-                user_id=user_id,
-                query=payload.user_input,
-                limit=4,
-                preference_signals=preference_signals,
-            )
+                recalled_memory_items = await self.memory_service.recall(
+                    user_id=user_id,
+                    query=payload.user_input,
+                    limit=4,
+                    preference_signals=preference_signals,
+                )
 
-            what_helped_before = await self.memory_service.recall_texts(
-                user_id=user_id,
-                query=payload.user_input,
-                limit=2,
-                memory_kinds=["helpful_strategy", "preference"],
-                preference_signals=preference_signals,
-            )
+                what_helped_before = await self.memory_service.recall_texts(
+                    user_id=user_id,
+                    query=payload.user_input,
+                    limit=2,
+                    memory_kinds=["helpful_strategy", "preference"],
+                    preference_signals=preference_signals,
+                )
 
-            trend_bundle = await self.trend_service.build_runtime_trend_bundle(user_id=user_id)
+                trend_bundle = await self.trend_service.build_runtime_trend_bundle(user_id=user_id)
 
-            await self._log_memory_trace(
-                user_id=user_id,
-                trace_name="memory_retrieval",
-                recalled_items=recalled_memory_items,
-                preference_signals=preference_signals,
-            )
+                await self._log_memory_trace(
+                    user_id=user_id,
+                    trace_name="memory_retrieval",
+                    recalled_items=recalled_memory_items,
+                    preference_signals=preference_signals,
+                )
 
         result = self.graph.invoke(
             {
@@ -222,6 +220,7 @@ class AgentRuntimeService:
                 "recurring_patterns": trend_bundle.get("recurring_patterns", []),
                 "intervention_effectiveness": trend_bundle.get("intervention_effectiveness", {}),
                 "trend_visualization": trend_bundle.get("trend_visualization", {}),
+                "support_track": None,
                 "follow_up_required": False,
                 "follow_up_plan_type": None,
                 "follow_up_plan_title": None,
@@ -281,16 +280,6 @@ class AgentRuntimeService:
                 )
                 generated_follow_up_plan = FollowUpPlanResponse.model_validate(created_plan)
 
-                resolved_follow_up_contract = generated_follow_up_plan.scheduling_contract_json or {}
-                resolved_temporal_contract = {}
-                if isinstance(resolved_follow_up_contract, dict):
-                    temporal_payload = resolved_follow_up_contract.get("temporal_contract")
-                    if isinstance(temporal_payload, dict):
-                        resolved_temporal_contract = temporal_payload
-                    scheduler_backend_value = resolved_follow_up_contract.get("scheduler_backend")
-                    if isinstance(scheduler_backend_value, str) and scheduler_backend_value.strip():
-                        resolved_scheduler_backend = scheduler_backend_value
-
                 created_event = await self.follow_up_service.create_event(
                     follow_up_plan_id=created_plan.id,
                     user_id=user_id,
@@ -298,31 +287,36 @@ class AgentRuntimeService:
                     outcome_status="planned",
                     notes="Runtime-generated follow up plan scheduled.",
                     event_payload_json={
-                        "scheduler_backend": resolved_scheduler_backend or result.get("scheduler_backend"),
+                        "scheduler_backend": result.get("scheduler_backend"),
                         "follow_up_due_at": result.get("follow_up_due_at"),
-                        "temporal_contract": resolved_temporal_contract or result.get("temporal_contract", {}),
+                        "temporal_contract": result.get("temporal_contract", {}),
                     },
                 )
                 follow_up_event_ids = [created_event.id]
 
-        if (
-            payload.user_id is not None
-            and safety_eval.safety_override
-            and safety_eval.safety_flag_type
-        ):
-            user_exists = await self.session.scalar(
-                select(User.id).where(User.id == str(payload.user_id))
-            )
-            if user_exists:
-                flag = SafetyFlag(
-                    user_id=str(payload.user_id),
-                    severity=safety_eval.risk_level,
-                    flag_type=safety_eval.safety_flag_type,
-                    summary=safety_eval.safety_summary,
-                    needs_review=True,
+                persisted_contract = created_plan.scheduling_contract_json or {}
+                result["follow_up_contract"] = persisted_contract
+                result["scheduler_backend"] = persisted_contract.get(
+                    "scheduler_backend",
+                    result.get("scheduler_backend"),
                 )
-                self.session.add(flag)
-                await self.session.commit()
+                result["follow_up_plan_id"] = created_plan.id
+                result["follow_up_event_ids"] = follow_up_event_ids
+
+            if safety_eval.safety_override and safety_eval.safety_flag_type:
+                user_exists = await self.session.scalar(
+                    select(User.id).where(User.id == str(payload.user_id))
+                )
+                if user_exists:
+                    flag = SafetyFlag(
+                        user_id=str(payload.user_id),
+                        severity=safety_eval.risk_level,
+                        flag_type=safety_eval.safety_flag_type,
+                        summary=safety_eval.safety_summary,
+                        needs_review=True,
+                    )
+                    self.session.add(flag)
+                    await self.session.commit()
 
         return AgentRuntimeSmokeResponse(
             status="ok",
@@ -357,13 +351,14 @@ class AgentRuntimeService:
             recurring_patterns=result.get("recurring_patterns", []),
             intervention_effectiveness=result.get("intervention_effectiveness", {}),
             trend_visualization=result.get("trend_visualization", {}),
+            support_track=result.get("support_track"),
             follow_up_required=bool(result.get("follow_up_required", False)),
             follow_up_plan=self._build_follow_up_plan_preview(result),
-            follow_up_contract=resolved_follow_up_contract or result.get("follow_up_contract", {}),
+            follow_up_contract=result.get("follow_up_contract", {}),
             follow_up_plan_id=generated_follow_up_plan.id if generated_follow_up_plan else result.get("follow_up_plan_id"),
             follow_up_event_ids=follow_up_event_ids or result.get("follow_up_event_ids", []),
-            temporal_contract=resolved_temporal_contract or result.get("temporal_contract", {}),
-            scheduler_backend=resolved_scheduler_backend or result.get("scheduler_backend"),
+            temporal_contract=result.get("temporal_contract", {}),
+            scheduler_backend=result.get("scheduler_backend"),
             generated_follow_up_plan=generated_follow_up_plan,
             memory_hits=[
                 RecalledMemoryItemResponse(

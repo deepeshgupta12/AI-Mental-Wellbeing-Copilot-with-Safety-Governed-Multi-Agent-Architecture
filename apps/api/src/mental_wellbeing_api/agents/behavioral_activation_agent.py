@@ -46,7 +46,12 @@ Keep the response short, concrete, and encouraging.
         f"Preferred support style:\n{state.get('preference_signals', {}).get('support_style', '')}\n\n"
         "Write a brief response focused on one tiny doable next step."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="behavioral_activation",
+    )
 
     state = {
         **state,

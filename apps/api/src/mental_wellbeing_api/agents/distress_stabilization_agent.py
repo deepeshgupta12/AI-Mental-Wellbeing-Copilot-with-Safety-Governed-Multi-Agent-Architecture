@@ -40,7 +40,12 @@ Keep the response brief, gentle, and concrete.
         f"Structured summary:\n{state.get('structured_input', '')}\n\n"
         "Write a brief stabilization response with 1-2 immediate next steps."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="distress_stabilization",
+    )
 
     state = {
         **state,

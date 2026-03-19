@@ -32,21 +32,28 @@ def run_preference_learning_agent(state: AgentRuntimeState) -> AgentRuntimeState
     specialist_agent = (state.get("specialist_agent") or "").lower()
     current_preferences = dict(state.get("preference_signals", {}))
 
-    inferred_support_style = current_preferences.get("support_style")
-    inferred_preferred_support_mode = current_preferences.get("preferred_support_mode")
+    existing_support_style = current_preferences.get("support_style")
+    existing_preferred_support_mode = current_preferences.get("preferred_support_mode")
+
+    inferred_support_style = existing_support_style
+    inferred_preferred_support_mode = existing_preferred_support_mode
 
     style_candidates = {support_mode, support_strategy, specialist_agent}
 
-    if style_candidates & DIRECT_STYLE_HINTS:
-        inferred_support_style = "direct"
-    elif style_candidates & REFLECTIVE_STYLE_HINTS:
-        inferred_support_style = "reflective"
-    elif style_candidates & RECOVERY_STYLE_HINTS:
-        inferred_support_style = "calm"
+    # Preserve an existing explicit user preference.
+    # Only infer support_style if it is currently missing.
+    if not inferred_support_style:
+        if style_candidates & DIRECT_STYLE_HINTS:
+            inferred_support_style = "direct"
+        elif style_candidates & REFLECTIVE_STYLE_HINTS:
+            inferred_support_style = "reflective"
+        elif style_candidates & RECOVERY_STYLE_HINTS:
+            inferred_support_style = "calm"
 
+    # Preferred support mode can still be learned, but stabilize wins when applicable.
     if style_candidates & STABILIZE_STYLE_HINTS:
         inferred_preferred_support_mode = "stabilize"
-    elif support_mode:
+    elif not inferred_preferred_support_mode and support_mode:
         inferred_preferred_support_mode = support_mode
 
     updated_preferences = {
@@ -71,12 +78,15 @@ def run_preference_learning_agent(state: AgentRuntimeState) -> AgentRuntimeState
         metadata={
             "support_style": inferred_support_style,
             "preferred_support_mode": inferred_preferred_support_mode,
+            "preserved_existing_support_style": bool(existing_support_style),
         },
     )
     state = append_handoff(
         state,
         from_agent="preference_learning",
-        to_agent="response_composer",
+        to_agent="follow_up_planner"
+        if "follow_up_planner" in state.get("execution_path", [])
+        else "response_composer",
         reason="preference adaptation signals prepared for composition",
     )
     return state

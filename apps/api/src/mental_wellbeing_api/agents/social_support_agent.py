@@ -39,7 +39,12 @@ Keep the tone warm and concise.
         f"Preferred support style:\n{state.get('preference_signals', {}).get('support_style', '')}\n\n"
         "Write a brief response that validates loneliness or disconnection and suggests one small support-seeking step."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="social_support",
+    )
 
     state = {
         **state,

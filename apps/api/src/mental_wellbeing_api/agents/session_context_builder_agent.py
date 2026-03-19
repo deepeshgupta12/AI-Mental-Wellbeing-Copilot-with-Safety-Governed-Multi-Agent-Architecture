@@ -5,7 +5,8 @@ from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 
 
 def run_session_context_builder_agent(state: AgentRuntimeState) -> AgentRuntimeState:
-    recalled_items = state.get("recalled_memory_items", [])
+    episodic_hits = state.get("episodic_memory_hits", [])
+    semantic_hits = state.get("semantic_memory_hits", [])
     preference_signals = state.get("preference_signals", {})
     what_helped_before = state.get("what_helped_before", [])
 
@@ -15,14 +16,21 @@ def run_session_context_builder_agent(state: AgentRuntimeState) -> AgentRuntimeS
         preference_lines = [f"- {key}: {value}" for key, value in preference_signals.items()]
         sections.append("Preference signals:\n" + "\n".join(preference_lines))
 
-    if recalled_items:
-        memory_lines = []
-        for item in recalled_items:
-            memory_kind = item.get("memory_kind", "memory")
-            content = item.get("content", "")
-            memory_lines.append(f"- [{memory_kind}] {content}")
-        sections.append("Relevant prior memories:\n" + "\n".join(memory_lines))
-    else:
+    if episodic_hits:
+        lines = [
+            f"- [{item.get('memory_kind', 'episodic')}] {item.get('content', '')}"
+            for item in episodic_hits
+        ]
+        sections.append("Relevant episodic memories:\n" + "\n".join(lines))
+
+    if semantic_hits:
+        lines = [
+            f"- [{item.get('memory_kind', 'semantic')}] {item.get('content', '')}"
+            for item in semantic_hits
+        ]
+        sections.append("Relevant semantic memories:\n" + "\n".join(lines))
+
+    if not episodic_hits and not semantic_hits:
         sections.append("Relevant prior memories:\n- No relevant prior memory was recalled.")
 
     if what_helped_before:
@@ -39,7 +47,8 @@ def run_session_context_builder_agent(state: AgentRuntimeState) -> AgentRuntimeS
         state,
         node_name="session_context_builder",
         metadata={
-            "memory_count": len(recalled_items),
+            "episodic_count": len(episodic_hits),
+            "semantic_count": len(semantic_hits),
             "preference_count": len(preference_signals),
             "helpful_before_count": len(what_helped_before),
         },
