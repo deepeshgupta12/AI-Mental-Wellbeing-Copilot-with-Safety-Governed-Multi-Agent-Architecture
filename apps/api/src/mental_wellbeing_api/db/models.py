@@ -1,4 +1,6 @@
 from mental_wellbeing_api.models.action_plan import ActionPlan
+from mental_wellbeing_api.models.admin_config_audit import AdminConfigAudit
+from mental_wellbeing_api.models.admin_config_version import AdminConfigVersion
 from mental_wellbeing_api.models.agent_trace import AgentTrace
 from mental_wellbeing_api.models.check_in import CheckIn
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
@@ -15,6 +17,8 @@ from mental_wellbeing_api.models.user import User, UserPreference, UserProfile
 
 __all__ = [
     "ActionPlan",
+    "AdminConfigAudit",
+    "AdminConfigVersion",
     "AgentTrace",
     "CheckIn",
     "ConversationMessage",
