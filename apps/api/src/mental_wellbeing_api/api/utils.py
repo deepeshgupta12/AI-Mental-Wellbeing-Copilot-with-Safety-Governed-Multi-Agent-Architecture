@@ -4,7 +4,9 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mental_wellbeing_api.models.action_plan import ActionPlan
 from mental_wellbeing_api.models.conversation import ConversationSession
+from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.models.user import User
 
 
@@ -22,3 +24,21 @@ async def ensure_conversation_session_exists(
     )
     if not conversation_exists:
         raise HTTPException(status_code=404, detail="Conversation session not found")
+
+
+async def ensure_action_plan_exists(session: AsyncSession, action_plan_id: str) -> None:
+    action_plan_exists = await session.scalar(
+        select(ActionPlan.id).where(ActionPlan.id == action_plan_id)
+    )
+    if not action_plan_exists:
+        raise HTTPException(status_code=404, detail="Action plan not found")
+
+
+async def ensure_follow_up_plan_exists(
+    session: AsyncSession, follow_up_plan_id: str
+) -> None:
+    follow_up_plan_exists = await session.scalar(
+        select(FollowUpPlan.id).where(FollowUpPlan.id == follow_up_plan_id)
+    )
+    if not follow_up_plan_exists:
+        raise HTTPException(status_code=404, detail="Follow up plan not found")
