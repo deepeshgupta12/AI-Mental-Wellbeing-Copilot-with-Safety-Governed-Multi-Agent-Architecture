@@ -29,6 +29,7 @@ export type UserProfile = {
   support_style: string | null;
   wellbeing_goals: string | null;
   focus_areas: string | null;
+  preferred_support_mode?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -40,6 +41,311 @@ export type User = {
   created_at: string;
   updated_at: string;
   profile: UserProfile | null;
+};
+
+export type CreateUserPayload = {
+  email: string;
+  display_name?: string | null;
+  timezone?: string | null;
+  support_style?: string | null;
+  wellbeing_goals?: string | null;
+  focus_areas?: string | null;
+};
+
+export type CheckIn = {
+  id: string;
+  user_id: string;
+  mood_score: number | null;
+  stress_score: number | null;
+  energy_score: number | null;
+  sleep_hours: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type CreateCheckInPayload = {
+  user_id: string;
+  mood_score?: number | null;
+  stress_score?: number | null;
+  energy_score?: number | null;
+  sleep_hours?: number | null;
+  notes?: string | null;
+};
+
+export type JournalEntry = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  content: string;
+  summary?: string | null;
+  emotional_tone?: string | null;
+  structured_insights_json?: Record<string, unknown> | null;
+  entry_type: string | null;
+  created_at: string;
+  updated_at?: string;
+};
+
+export type CreateJournalEntryPayload = {
+  user_id: string;
+  title?: string | null;
+  content: string;
+  entry_type?: string | null;
+};
+
+export type ConversationSession = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  status: string;
+  support_mode?: string | null;
+  resolved_mode?: string | null;
+  session_summary?: string | null;
+  started_at: string;
+  updated_at: string;
+};
+
+export type CreateConversationSessionPayload = {
+  user_id: string;
+  title?: string | null;
+  status?: string;
+};
+
+export type ConversationMessage = {
+  id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  message_type: string;
+  created_at: string;
+};
+
+export type CreateConversationMessagePayload = {
+  session_id: string;
+  role: string;
+  content: string;
+  message_type?: string;
+};
+
+export type ActionPlan = {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string | null;
+  timeframe: string | null;
+  is_completed: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CreateActionPlanPayload = {
+  user_id: string;
+  title: string;
+  description?: string | null;
+  timeframe?: string | null;
+};
+
+export type MemoryItem = {
+  source_type: string;
+  source_id: string;
+  title: string;
+  summary: string;
+  created_at: string;
+  memory_kind?: string | null;
+  importance_score?: number | null;
+};
+
+export type MemorySummary = {
+  user_id: string;
+  display_name: string | null;
+  wellbeing_goals: string | null;
+  recent_memories: MemoryItem[];
+  helpful_before: string[];
+  recurring_triggers: string[];
+  preference_signals: Record<string, string>;
+  weekly_reflection_summary: string | null;
+  recent_journal_themes: string[];
+};
+
+export type TrendSummary = {
+  user_id: string;
+  total_check_ins: number;
+  avg_mood_score: number | null;
+  avg_stress_score: number | null;
+  avg_energy_score: number | null;
+  avg_sleep_hours: number | null;
+  total_journal_entries: number;
+  total_conversation_sessions: number;
+  total_conversation_messages: number;
+  latest_check_in_at: string | null;
+  latest_journal_entry_at: string | null;
+  latest_conversation_at: string | null;
+  latest_snapshot_window_type?: string | null;
+  latest_snapshot_created_at?: string | null;
+  top_journal_themes?: string[];
+  recurring_trigger_count?: number;
+  support_progress_summary?: string | null;
+  recurring_patterns?: string[];
+  intervention_effectiveness?: Record<string, unknown>;
+  trend_visualization?: Record<string, unknown>;
+};
+
+export type SafetyFlag = {
+  id: string;
+  user_id: string;
+  severity: string;
+  flag_type: string;
+  summary: string | null;
+  needs_review: boolean;
+  is_resolved: boolean;
+  reviewer_note?: string | null;
+  reviewed_at?: string | null;
+  resolved_at?: string | null;
+  created_at: string;
+};
+
+export type CreateSafetyFlagPayload = {
+  user_id: string;
+  severity: string;
+  flag_type: string;
+  summary?: string | null;
+  needs_review?: boolean;
+};
+
+export type UpdateSafetyFlagPayload = {
+  needs_review?: boolean;
+  is_resolved?: boolean;
+  reviewer_note?: string | null;
+};
+
+export type SafetyQueueItem = {
+  id: string;
+  user_id: string;
+  severity: string;
+  flag_type: string;
+  summary: string | null;
+  needs_review: boolean;
+  is_resolved: boolean;
+  created_at: string;
+};
+
+export type SafetyDashboardCounts = {
+  total_flags: number;
+  open_flags: number;
+  resolved_flags: number;
+  high_severity_open_flags: number;
+};
+
+export type SafetyEvaluationResponse = {
+  risk_level: string;
+  safety_flag_type: string | null;
+  safety_summary: string | null;
+  safety_override: boolean;
+};
+
+export type RecalledMemoryItem = {
+  source_type: string;
+  source_id: string;
+  memory_kind: string;
+  content: string;
+  importance_score?: number | null;
+  relevance_score?: number | null;
+  created_at?: string | null;
+};
+
+export type NodeTraceEvent = {
+  node_name: string;
+  status: string;
+  timestamp?: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type HandoffEvent = {
+  from_agent: string;
+  to_agent: string;
+  reason: string;
+  timestamp?: string | null;
+  contract: Record<string, string>;
+};
+
+export type FollowUpPlan = {
+  id: string;
+  user_id: string;
+  session_id: string | null;
+  action_plan_id: string | null;
+  source_agent: string;
+  plan_type: string;
+  title: string;
+  description: string | null;
+  status: string;
+  delivery_channel: string;
+  scheduled_for: string | null;
+  timezone: string | null;
+  cadence_json?: Record<string, unknown> | null;
+  scheduling_contract_json?: Record<string, unknown> | null;
+  metadata_json?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentRuntimeSmokePayload = {
+  user_input: string;
+  provider?: "openai" | "ollama" | "mock";
+  user_id?: string | null;
+};
+
+export type AgentRuntimeSmokeResponse = {
+  status: string;
+  provider: string;
+  structured_input: string;
+  reflective_response: string;
+  specialist_response?: string | null;
+  final_response: string;
+  risk_level: string;
+  safety_flag_type?: string | null;
+  safety_summary?: string | null;
+  safety_override: boolean;
+
+  tone_label?: string | null;
+  emotion_label?: string | null;
+  emotion_intensity?: string | null;
+  emotional_signals: string[];
+
+  intent_label?: string | null;
+  support_mode?: string | null;
+  support_strategy?: string | null;
+  specialist_agent?: string | null;
+  routing_reason?: string | null;
+  routing_contract: Record<string, string>;
+
+  session_context?: string | null;
+  preference_signals: Record<string, string>;
+  what_helped_before: string[];
+  coping_recommendations: string[];
+  journaling_insights: string[];
+  follow_up_suggestions: string[];
+
+  progress_summary?: string | null;
+  support_progress_summary?: string | null;
+  trend_summary?: string | null;
+  recurring_patterns: string[];
+  intervention_effectiveness: Record<string, unknown>;
+  trend_visualization: Record<string, unknown>;
+
+  follow_up_required?: boolean;
+  follow_up_plan?: Record<string, unknown>;
+  follow_up_contract?: Record<string, unknown>;
+  follow_up_plan_id?: string | null;
+  follow_up_event_ids?: string[];
+  temporal_contract?: Record<string, unknown>;
+  scheduler_backend?: string | null;
+
+  generated_follow_up_plan?: FollowUpPlan | null;
+  memory_hits: RecalledMemoryItem[];
+
+  execution_path: string[];
+  node_trace: NodeTraceEvent[];
+  handoff_history: HandoffEvent[];
+  execution_summary?: string | null;
 };
 
 export type AdminFlaggedSession = {
