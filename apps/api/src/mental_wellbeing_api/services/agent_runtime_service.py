@@ -20,6 +20,7 @@ from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
 from mental_wellbeing_api.services.follow_up_service import FollowUpService
 from mental_wellbeing_api.services.memory_service import MemoryRecallItem, MemoryService
 from mental_wellbeing_api.services.preference_service import PreferenceService
+from mental_wellbeing_api.services.safety_review_service import SafetyReviewService
 from mental_wellbeing_api.services.safety_service import (
     SafetyEvaluationResponse,
     SafetyService,
@@ -36,6 +37,7 @@ class AgentRuntimeService:
         self.preference_service = PreferenceService(session)
         self.trend_service = TrendIntelligenceService(session)
         self.follow_up_service = FollowUpService(session)
+        self.safety_review_service = SafetyReviewService(session)
 
     async def evaluate_safety_only(
         self,
@@ -119,6 +121,8 @@ class AgentRuntimeService:
                     "support_mode": result.get("support_mode"),
                     "specialist_agent": result.get("specialist_agent"),
                     "support_track": result.get("support_track"),
+                    "risk_level": result.get("risk_level"),
+                    "requires_human_review": result.get("requires_human_review"),
                 },
                 output_payload_json={
                     "status": event.get("status"),
@@ -141,6 +145,64 @@ class AgentRuntimeService:
             "delivery_channel": result.get("follow_up_delivery_channel"),
             "status": result.get("follow_up_status"),
         }
+
+    async def _create_safety_runtime_artifacts(
+        self,
+        *,
+        payload: AgentRuntimeSmokeRequest,
+        result: dict,
+        safety_eval: SafetyEvaluationResponse,
+    ) -> None:
+        if payload.user_id is None:
+            return
+
+        user_id = str(payload.user_id)
+        user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
+        if not user_exists:
+            return
+
+        created_flag: SafetyFlag | None = None
+
+        if safety_eval.safety_flag_type:
+            created_flag = SafetyFlag(
+                user_id=user_id,
+                severity=safety_eval.risk_level,
+                flag_type=safety_eval.safety_flag_type,
+                summary=safety_eval.safety_summary,
+                needs_review=bool(safety_eval.requires_human_review),
+            )
+            self.session.add(created_flag)
+            await self.session.commit()
+            await self.session.refresh(created_flag)
+
+        if safety_eval.requires_human_review or safety_eval.safety_flag_type:
+            event = await self.safety_review_service.create_safety_event(
+                user_id=user_id,
+                session_id=None,
+                safety_flag_id=created_flag.id if created_flag else None,
+                event_type="runtime_safety_detection",
+                severity="critical" if safety_eval.risk_level == "high" else "elevated",
+                risk_level=safety_eval.risk_level,
+                title="Runtime safety event",
+                summary=safety_eval.safety_summary,
+                evidence_json={
+                    "user_input": payload.user_input,
+                    "risk_level": safety_eval.risk_level,
+                    "flag_type": safety_eval.safety_flag_type,
+                    "decision_path_label": result.get("decision_path_label"),
+                    "human_summary": result.get("human_summary"),
+                },
+                event_payload_json={
+                    "trace_id": result.get("trace_id"),
+                    "routing_contract": result.get("routing_contract", {}),
+                    "execution_summary": result.get("execution_summary"),
+                },
+                requires_human_review=bool(safety_eval.requires_human_review),
+                escalation_channel="human_reviewer" if safety_eval.requires_human_review else None,
+            )
+
+            result["queue_status"] = event.queue_status
+            result["review_recommended"] = bool(safety_eval.requires_human_review)
 
     async def run_smoke_flow(
         self,
@@ -237,6 +299,16 @@ class AgentRuntimeService:
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
                 "safety_override": safety_eval.safety_override,
+                "requires_human_review": safety_eval.requires_human_review,
+                "escalation_recommended": safety_eval.escalation_recommended,
+                "review_priority": safety_eval.review_priority,
+                "queue_status": safety_eval.queue_status,
+                "decision_path_label": "standard_support",
+                "human_summary": None,
+                "evidence_bundle": {},
+                "quality_checks": {},
+                "audit_snapshot": {},
+                "review_recommended": False,
             }
         )
 
@@ -303,20 +375,11 @@ class AgentRuntimeService:
                 result["follow_up_plan_id"] = created_plan.id
                 result["follow_up_event_ids"] = follow_up_event_ids
 
-            if safety_eval.safety_override and safety_eval.safety_flag_type:
-                user_exists = await self.session.scalar(
-                    select(User.id).where(User.id == str(payload.user_id))
-                )
-                if user_exists:
-                    flag = SafetyFlag(
-                        user_id=str(payload.user_id),
-                        severity=safety_eval.risk_level,
-                        flag_type=safety_eval.safety_flag_type,
-                        summary=safety_eval.safety_summary,
-                        needs_review=True,
-                    )
-                    self.session.add(flag)
-                    await self.session.commit()
+            await self._create_safety_runtime_artifacts(
+                payload=payload,
+                result=result,
+                safety_eval=safety_eval,
+            )
 
         return AgentRuntimeSmokeResponse(
             status="ok",
@@ -352,6 +415,16 @@ class AgentRuntimeService:
             intervention_effectiveness=result.get("intervention_effectiveness", {}),
             trend_visualization=result.get("trend_visualization", {}),
             support_track=result.get("support_track"),
+            requires_human_review=bool(result.get("requires_human_review", False)),
+            escalation_recommended=bool(result.get("escalation_recommended", False)),
+            review_priority=result.get("review_priority"),
+            queue_status=result.get("queue_status"),
+            decision_path_label=result.get("decision_path_label"),
+            human_summary=result.get("human_summary"),
+            evidence_bundle=result.get("evidence_bundle", {}),
+            quality_checks=result.get("quality_checks", {}),
+            audit_snapshot=result.get("audit_snapshot", {}),
+            review_recommended=bool(result.get("review_recommended", False)),
             follow_up_required=bool(result.get("follow_up_required", False)),
             follow_up_plan=self._build_follow_up_plan_preview(result),
             follow_up_contract=result.get("follow_up_contract", {}),

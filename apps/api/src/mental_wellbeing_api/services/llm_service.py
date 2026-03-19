@@ -26,6 +26,7 @@ class LLMService:
             "journaling_insight": "There may be a pattern here worth naming more clearly before trying to solve all of it at once.",
             "habit_care_plan": "Let's make this smaller and more repeatable so it can actually fit into your day.",
             "response_composer": "It sounds like this has been weighing on you. Let's take one clear next step together.",
+            "crisis_escalation": "What you shared may need immediate human support right now. Please contact local emergency services or a crisis line now, and reach out to a trusted person if you can.",
         }
         return fallback_map.get(
             agent_name or "",
@@ -44,6 +45,7 @@ class LLMService:
             "journaling_insight": "There may be a repeating emotional pattern here that is worth naming before solving.",
             "habit_care_plan": "Build the smallest version of the habit so it is easy to restart tomorrow too.",
             "response_composer": "It sounds like this has been weighing on you, and we can take it one clear step at a time.",
+            "crisis_escalation": "This sounds serious enough that immediate human support matters most right now.",
         }
         return mock_map.get(agent_name or "", self._fallback_text(agent_name))
 
@@ -54,10 +56,14 @@ class LLMService:
         user_prompt: str,
         *,
         agent_name: str | None = None,
+        risk_level: str | None = None,
+        final_stage: bool = False,
     ) -> str:
         resolution = self.assignment_service.resolve(
             provider=provider,
             agent_name=agent_name,
+            risk_level=risk_level,
+            final_stage=final_stage,
         )
         normalized_provider = resolution["provider"]
         assigned_model = resolution.get("model")
