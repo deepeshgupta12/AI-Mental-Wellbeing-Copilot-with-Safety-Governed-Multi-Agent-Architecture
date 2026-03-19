@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
+
 
 class AgentRuntimeSmokeRequest(BaseModel):
     user_input: str = Field(min_length=1, max_length=4000)
@@ -73,6 +75,7 @@ class AgentRuntimeSmokeResponse(BaseModel):
     recurring_patterns: list[str] = Field(default_factory=list)
     intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
     trend_visualization: dict[str, Any] = Field(default_factory=dict)
+    generated_follow_up_plan: FollowUpPlanResponse | None = None
     memory_hits: list[RecalledMemoryItemResponse] = Field(default_factory=list)
 
     execution_path: list[str] = Field(default_factory=list)

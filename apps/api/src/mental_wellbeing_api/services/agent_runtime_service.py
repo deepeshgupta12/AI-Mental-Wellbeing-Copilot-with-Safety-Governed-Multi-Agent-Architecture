@@ -16,6 +16,8 @@ from mental_wellbeing_api.schemas.agent_runtime import (
     NodeTraceEventResponse,
     RecalledMemoryItemResponse,
 )
+from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
+from mental_wellbeing_api.services.follow_up_service import FollowUpService
 from mental_wellbeing_api.services.memory_service import MemoryRecallItem, MemoryService
 from mental_wellbeing_api.services.preference_service import PreferenceService
 from mental_wellbeing_api.services.safety_service import (
@@ -33,6 +35,7 @@ class AgentRuntimeService:
         self.memory_service = MemoryService(session)
         self.preference_service = PreferenceService(session)
         self.trend_service = TrendIntelligenceService(session)
+        self.follow_up_service = FollowUpService(session)
 
     async def evaluate_safety_only(
         self,
@@ -128,6 +131,49 @@ class AgentRuntimeService:
 
         await self.session.commit()
 
+    def _should_create_follow_up_plan(
+        self,
+        *,
+        user_id: str | None,
+        safety_override: bool,
+        follow_up_suggestions: list[str],
+    ) -> bool:
+        return bool(user_id and not safety_override and follow_up_suggestions)
+
+    def _resolve_follow_up_plan_type(self, result: dict) -> str:
+        support_mode = (result.get("support_mode") or "").strip().lower()
+        support_strategy = (result.get("support_strategy") or "").strip().lower()
+
+        if support_mode:
+            return support_mode
+        if support_strategy:
+            return support_strategy
+        return "general_follow_up"
+
+    def _resolve_follow_up_title(self, result: dict) -> str:
+        support_mode = (result.get("support_mode") or "").strip().lower()
+
+        title_map = {
+            "plan": "Check in on your plan",
+            "recover": "Check in on your recovery",
+            "reflect": "Continue this reflection",
+            "connect": "Follow up on reaching out",
+            "reframe": "Revisit this reframe",
+            "activate": "Restart with one small step",
+            "stabilize": "Follow up on stabilization",
+        }
+        return title_map.get(support_mode, "Continue this support plan")
+
+    def _resolve_follow_up_description(self, result: dict) -> str | None:
+        follow_up_suggestions = result.get("follow_up_suggestions", [])
+        if follow_up_suggestions:
+            return str(follow_up_suggestions[0])
+
+        support_strategy = result.get("support_strategy")
+        if support_strategy:
+            return f"Follow up on the {support_strategy} support plan."
+        return "Check in on the next small step from this support session."
+
     async def run_smoke_flow(
         self,
         payload: AgentRuntimeSmokeRequest,
@@ -139,6 +185,7 @@ class AgentRuntimeService:
         preference_signals: dict[str, str] = {}
         what_helped_before: list[str] = []
         trend_bundle: dict = {}
+        generated_follow_up_plan = None
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
@@ -213,16 +260,45 @@ class AgentRuntimeService:
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
+
             await self._log_execution_trace(
                 user_id=user_id,
                 trace_id=trace_id,
                 result=result,
             )
+
             await self.preference_service.persist_learned_preferences(
                 user_id=user_id,
                 learned_preferences=result.get("learned_preferences"),
             )
             preference_signals = await self.preference_service.get_preference_signals(user_id)
+
+            follow_up_suggestions = result.get("follow_up_suggestions", [])
+            if self._should_create_follow_up_plan(
+                user_id=user_id,
+                safety_override=bool(result.get("safety_override", False)),
+                follow_up_suggestions=follow_up_suggestions,
+            ):
+                created_plan = await self.follow_up_service.create_plan(
+                    user_id=user_id,
+                    source_agent=result.get("specialist_agent") or "response_composer",
+                    plan_type=self._resolve_follow_up_plan_type(result),
+                    title=self._resolve_follow_up_title(result),
+                    description=self._resolve_follow_up_description(result),
+                    session_id=None,
+                    action_plan_id=None,
+                    delivery_channel="in_app",
+                    timezone_name=preference_signals.get("timezone"),
+                    support_mode=result.get("support_mode"),
+                    support_strategy=result.get("support_strategy"),
+                    specialist_agent=result.get("specialist_agent"),
+                    metadata={
+                        "trace_id": trace_id,
+                        "routing_contract": result.get("routing_contract", {}),
+                        "follow_up_suggestions": follow_up_suggestions[:3],
+                    },
+                )
+                generated_follow_up_plan = FollowUpPlanResponse.model_validate(created_plan)
 
         if (
             payload.user_id is not None
@@ -276,6 +352,7 @@ class AgentRuntimeService:
             recurring_patterns=result.get("recurring_patterns", []),
             intervention_effectiveness=result.get("intervention_effectiveness", {}),
             trend_visualization=result.get("trend_visualization", {}),
+            generated_follow_up_plan=generated_follow_up_plan,
             memory_hits=[
                 RecalledMemoryItemResponse(
                     source_type=item.source_type,
