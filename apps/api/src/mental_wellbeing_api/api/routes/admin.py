@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,17 +11,36 @@ from mental_wellbeing_api.models.conversation import ConversationMessage, Conver
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
-from mental_wellbeing_api.prompts.registry import load_prompt_registry, load_runtime_policy
+from mental_wellbeing_api.prompts.registry import (
+    load_prompt_registry_document,
+    load_routing_rules,
+    load_runtime_policy,
+)
 from mental_wellbeing_api.schemas.admin import (
+    AdminAnalyticsOverviewResponse,
     AdminAuditItemResponse,
+    AdminConfigAuditResponse,
+    AdminConfigDiffResponse,
+    AdminConfigUpdateRequest,
+    AdminConfigVersionResponse,
+    AdminFlaggedSessionDetailResponse,
     AdminFlaggedSessionResponse,
     AdminFollowUpEventResponse,
     AdminFollowUpOverviewResponse,
     AdminFollowUpPlanResponse,
+    AdminInterventionLogResponse,
+    AdminInterventionOverviewResponse,
+    AdminOpsOverviewResponse,
     AdminPolicyConfigResponse,
+    AdminRoutingRulesResponse,
     AdminSessionLogResponse,
+    AdminTraceExecutionDetailResponse,
+    AdminTraceExecutionSummaryResponse,
+    AdminTraceItemResponse,
     AdminTrendOverviewResponse,
 )
+from mental_wellbeing_api.services.admin_observability_service import AdminObservabilityService
+from mental_wellbeing_api.services.config_registry_service import ConfigRegistryService
 from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -42,6 +61,53 @@ async def get_flagged_sessions(
         .limit(limit)
     )
     return list(result.all())
+
+
+@router.get("/flagged-sessions/{flag_id}", response_model=AdminFlaggedSessionDetailResponse)
+async def get_flagged_session_detail(
+    flag_id: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminFlaggedSessionDetailResponse:
+    service = AdminObservabilityService(session)
+    try:
+        payload = await service.get_flagged_session_detail(flag_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return AdminFlaggedSessionDetailResponse(
+        flag=payload["flag"],
+        related_traces=[
+            {
+                "id": item.id,
+                "trace_name": item.trace_name,
+                "user_id": item.user_id,
+                "agent_name": item.agent_name,
+                "handoff_from_agent": item.handoff_from_agent,
+                "handoff_to_agent": item.handoff_to_agent,
+                "input_payload_json": item.input_payload_json,
+                "output_payload_json": item.output_payload_json,
+                "status": item.status,
+                "latency_ms": item.latency_ms,
+                "notes": item.notes,
+                "created_at": item.created_at,
+            }
+            for item in payload["related_traces"]
+        ],
+        related_sessions=[
+            {
+                "id": item.id,
+                "user_id": item.user_id,
+                "title": item.title,
+                "status": item.status,
+                "support_mode": item.support_mode,
+                "resolved_mode": item.resolved_mode,
+                "session_summary": item.session_summary,
+                "started_at": item.started_at,
+                "updated_at": item.updated_at,
+            }
+            for item in payload["related_sessions"]
+        ],
+    )
 
 
 @router.get("/session-logs", response_model=list[AdminSessionLogResponse])
@@ -176,7 +242,8 @@ async def get_audit_trail(
 async def get_policy_config() -> AdminPolicyConfigResponse:
     return AdminPolicyConfigResponse(
         runtime_policy=load_runtime_policy(),
-        prompt_registry=load_prompt_registry(),
+        prompt_registry=load_prompt_registry_document(),
+        routing_rules=load_routing_rules(),
     )
 
 
@@ -192,9 +259,9 @@ async def get_trend_overview(
 async def get_follow_up_overview(
     session: AsyncSession = Depends(db_session_dep),
 ) -> AdminFollowUpOverviewResponse:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
-    total_follow_up_plans = int(((await session.execute(select(func.count(FollowUpPlan.id)))).scalar() or 0))
+    total_follow_up_plans = int((await session.scalar(select(func.count(FollowUpPlan.id)))) or 0)
 
     active_scheduled_plans = int(
         (
@@ -364,3 +431,196 @@ async def get_follow_up_events(
         .limit(limit)
     )
     return list(result.all())
+
+
+@router.get("/agent-traces", response_model=list[AdminTraceItemResponse])
+async def get_agent_traces(
+    limit: int = 100,
+    trace_name: str | None = None,
+    user_id: str | None = None,
+    agent_name: str | None = None,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminTraceItemResponse]:
+    service = AdminObservabilityService(session)
+    return await service.list_agent_traces(
+        limit=limit,
+        trace_name=trace_name,
+        user_id=user_id,
+        agent_name=agent_name,
+    )
+
+
+@router.get("/agent-trace-executions", response_model=list[AdminTraceExecutionSummaryResponse])
+async def get_agent_trace_executions(
+    limit: int = 100,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminTraceExecutionSummaryResponse]:
+    service = AdminObservabilityService(session)
+    payload = await service.list_grouped_runtime_executions(limit=limit)
+    return [AdminTraceExecutionSummaryResponse(**item) for item in payload]
+
+
+@router.get("/agent-trace-executions/{trace_name}", response_model=AdminTraceExecutionDetailResponse)
+async def get_agent_trace_execution_detail(
+    trace_name: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminTraceExecutionDetailResponse:
+    service = AdminObservabilityService(session)
+    payload = await service.get_runtime_execution_detail(trace_name)
+    return AdminTraceExecutionDetailResponse(
+        trace_name=payload["trace_name"],
+        event_count=payload["event_count"],
+        events=payload["events"],
+    )
+
+
+@router.get("/intervention-logs", response_model=list[AdminInterventionLogResponse])
+async def get_intervention_logs(
+    limit: int = 100,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminInterventionLogResponse]:
+    service = AdminObservabilityService(session)
+    return await service.list_intervention_logs(limit=limit)
+
+
+@router.get("/intervention-overview", response_model=AdminInterventionOverviewResponse)
+async def get_intervention_overview(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminInterventionOverviewResponse:
+    service = AdminObservabilityService(session)
+    return AdminInterventionOverviewResponse(**(await service.get_intervention_overview()))
+
+
+@router.get("/routing-rules", response_model=AdminRoutingRulesResponse)
+async def get_routing_rules(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminRoutingRulesResponse:
+    registry = ConfigRegistryService(session)
+    active = await registry.get_active("routing_rules")
+    return AdminRoutingRulesResponse(
+        active_version=active,
+        live_payload=load_routing_rules(),
+    )
+
+
+@router.put("/routing-rules", response_model=AdminConfigVersionResponse)
+async def update_routing_rules(
+    payload: AdminConfigUpdateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigVersionResponse:
+    registry = ConfigRegistryService(session)
+    return await registry.update_config(
+        config_key="routing_rules",
+        payload=payload.payload_json,
+        change_note=payload.change_note,
+        actor=payload.actor,
+    )
+
+
+@router.get("/runtime-policy", response_model=AdminConfigVersionResponse)
+async def get_runtime_policy_active_version(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigVersionResponse:
+    registry = ConfigRegistryService(session)
+    return await registry.get_active("runtime_policy")
+
+
+@router.get("/runtime-policy/versions", response_model=list[AdminConfigVersionResponse])
+async def get_runtime_policy_versions(
+    limit: int = 20,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminConfigVersionResponse]:
+    registry = ConfigRegistryService(session)
+    return await registry.list_versions("runtime_policy", limit=limit)
+
+
+@router.put("/runtime-policy", response_model=AdminConfigVersionResponse)
+async def update_runtime_policy(
+    payload: AdminConfigUpdateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigVersionResponse:
+    registry = ConfigRegistryService(session)
+    return await registry.update_config(
+        config_key="runtime_policy",
+        payload=payload.payload_json,
+        change_note=payload.change_note,
+        actor=payload.actor,
+    )
+
+
+@router.get("/prompt-registry", response_model=AdminConfigVersionResponse)
+async def get_prompt_registry_active_version(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigVersionResponse:
+    registry = ConfigRegistryService(session)
+    return await registry.get_active("prompt_registry")
+
+
+@router.get("/prompt-registry/versions", response_model=list[AdminConfigVersionResponse])
+async def get_prompt_registry_versions(
+    limit: int = 20,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminConfigVersionResponse]:
+    registry = ConfigRegistryService(session)
+    return await registry.list_versions("prompt_registry", limit=limit)
+
+
+@router.put("/prompt-registry", response_model=AdminConfigVersionResponse)
+async def update_prompt_registry(
+    payload: AdminConfigUpdateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigVersionResponse:
+    registry = ConfigRegistryService(session)
+    return await registry.update_config(
+        config_key="prompt_registry",
+        payload=payload.payload_json,
+        change_note=payload.change_note,
+        actor=payload.actor,
+    )
+
+
+@router.get("/config-audit", response_model=list[AdminConfigAuditResponse])
+async def get_config_audit(
+    config_key: str | None = Query(default=None),
+    limit: int = 50,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminConfigAuditResponse]:
+    registry = ConfigRegistryService(session)
+    return await registry.list_audits(config_key=config_key, limit=limit)
+
+
+@router.get("/config-diff", response_model=AdminConfigDiffResponse)
+async def get_config_diff(
+    config_key: str,
+    from_version_id: str,
+    to_version_id: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminConfigDiffResponse:
+    registry = ConfigRegistryService(session)
+    try:
+        payload = await registry.get_diff(
+            config_key=config_key,
+            from_version_id=from_version_id,
+            to_version_id=to_version_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return AdminConfigDiffResponse(**payload)
+
+
+@router.get("/ops-overview", response_model=AdminOpsOverviewResponse)
+async def get_ops_overview(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminOpsOverviewResponse:
+    service = AdminObservabilityService(session)
+    payload = await service.get_ops_overview()
+    return AdminOpsOverviewResponse(**payload)
+
+
+@router.get("/analytics/overview", response_model=AdminAnalyticsOverviewResponse)
+async def get_analytics_overview(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminAnalyticsOverviewResponse:
+    service = AdminObservabilityService(session)
+    payload = await service.get_analytics_overview()
+    return AdminAnalyticsOverviewResponse(**payload)

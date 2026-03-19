@@ -22,6 +22,18 @@ class FollowUpPlanCreateRequest(BaseModel):
     metadata_json: dict | None = None
 
 
+class FollowUpPlanUpdateRequest(BaseModel):
+    status: str | None = None
+    scheduled_for: datetime | None = None
+    timezone: str | None = None
+    metadata_json: dict | None = None
+
+
+class FollowUpPlanActionRequest(BaseModel):
+    notes: str | None = None
+    outcome_status: str | None = None
+
+
 class FollowUpPlanResponse(BaseModel):
     id: str
     user_id: str

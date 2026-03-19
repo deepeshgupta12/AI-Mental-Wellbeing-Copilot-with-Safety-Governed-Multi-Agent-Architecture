@@ -5,12 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
+from mental_wellbeing_api.services.follow_up_contract_service import FollowUpContractService
 from mental_wellbeing_api.services.scheduler_service import SchedulerService
 
 
 class FollowUpService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.contracts = FollowUpContractService()
         self.scheduler = SchedulerService(session)
 
     async def create_plan(
@@ -43,13 +45,11 @@ class FollowUpService:
             support_mode=support_mode,
             support_strategy=support_strategy,
             specialist_agent=specialist_agent,
-            metadata=metadata or {},
+            metadata=metadata,
         )
 
     async def get_plan(self, *, follow_up_plan_id: str) -> FollowUpPlan | None:
-        return await self.session.scalar(
-            select(FollowUpPlan).where(FollowUpPlan.id == follow_up_plan_id)
-        )
+        return await self.session.get(FollowUpPlan, follow_up_plan_id)
 
     async def list_plans_for_user(self, *, user_id: str) -> list[FollowUpPlan]:
         result = await self.session.scalars(
@@ -58,6 +58,32 @@ class FollowUpService:
             .order_by(desc(FollowUpPlan.created_at))
         )
         return list(result.all())
+
+    async def update_plan(
+        self,
+        *,
+        follow_up_plan_id: str,
+        status: str | None = None,
+        scheduled_for=None,
+        timezone_name: str | None = None,
+        metadata_json: dict | None = None,
+    ) -> FollowUpPlan:
+        item = await self.session.get(FollowUpPlan, follow_up_plan_id)
+        if item is None:
+            raise ValueError("Follow up plan not found")
+
+        if status is not None:
+            item.status = status
+        if scheduled_for is not None:
+            item.scheduled_for = scheduled_for
+        if timezone_name is not None:
+            item.timezone = timezone_name
+        if metadata_json is not None:
+            item.metadata_json = metadata_json
+
+        await self.session.commit()
+        await self.session.refresh(item)
+        return item
 
     async def create_event(
         self,
@@ -89,40 +115,6 @@ class FollowUpService:
             .order_by(desc(FollowUpEvent.created_at))
         )
         return list(result.all())
-
-    async def update_plan_status(
-        self,
-        *,
-        follow_up_plan_id: str,
-        status: str,
-        notes: str | None = None,
-        outcome_status: str | None = None,
-    ) -> FollowUpPlan:
-        item = await self.get_plan(follow_up_plan_id=follow_up_plan_id)
-        if item is None:
-            raise ValueError("Follow up plan not found")
-
-        item.status = status
-        await self.session.commit()
-        await self.session.refresh(item)
-
-        event_type_map = {
-            "completed": "completed",
-            "cancelled": "cancelled",
-            "paused": "paused",
-            "scheduled": "scheduled",
-        }
-        event_type = event_type_map.get(status, "status_updated")
-
-        await self.create_event(
-            follow_up_plan_id=item.id,
-            user_id=item.user_id,
-            event_type=event_type,
-            outcome_status=outcome_status or status,
-            notes=notes,
-            event_payload_json={"status": status},
-        )
-        return item
 
     async def complete_plan(
         self,

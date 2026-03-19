@@ -4,22 +4,24 @@ import Link from "next/link";
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
   BarChart3,
-  Cog,
   FileSearch,
   Flag,
+  GitCompare,
   LayoutDashboard,
+  Route,
   ScrollText,
-  ShieldAlert,
+  Settings2,
 } from "lucide-react";
 
 const adminNav = [
   { title: "Overview", url: "/admin", icon: LayoutDashboard },
+  { title: "Trace Viewer", url: "/admin/cases", icon: FileSearch },
   { title: "Flagged Sessions", url: "/admin/flagged", icon: Flag },
-  { title: "Case Reviews", url: "/admin/cases", icon: FileSearch },
-  { title: "Safety Events", url: "/admin/safety-events", icon: ShieldAlert },
-  { title: "Audit Logs", url: "/admin/audit", icon: ScrollText },
-  { title: "Policy & Prompts", url: "/admin/policy", icon: Cog },
+  { title: "Interventions", url: "/admin/safety-events", icon: Activity },
+  { title: "Config Audit", url: "/admin/audit", icon: GitCompare },
+  { title: "Routing / Policy", url: "/admin/policy", icon: Route },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
@@ -31,18 +33,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh w-full bg-background">
-      <aside className="hidden min-h-screen w-60 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
+      <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
         <div className="border-b border-border p-5">
           <Link href="/admin" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground">
-              <span className="font-heading text-sm font-bold text-background">A</span>
+              <Settings2 className="h-4 w-4 text-background" />
             </div>
             <div>
               <span className="block font-heading text-base font-semibold leading-tight text-foreground">
-                Aether
+                Aether Admin
               </span>
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Operations
+                Intelligence Console
               </span>
             </div>
           </Link>
@@ -81,13 +83,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
           <h2 className="font-heading font-semibold text-foreground">
-            Operations Console
+            Admin Intelligence & Observability
           </h2>
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <span className="text-xs font-medium text-muted-foreground">R</span>
-            </div>
-          </div>
+          <div className="text-xs text-muted-foreground">V2-10</div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

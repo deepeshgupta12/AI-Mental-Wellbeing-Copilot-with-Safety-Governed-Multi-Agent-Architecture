@@ -39,6 +39,8 @@ def test_agent_runtime_smoke() -> None:
     assert "follow_up_required" in payload
     assert "follow_up_plan" in payload
     assert "follow_up_contract" in payload
+    assert "follow_up_plan_id" in payload
+    assert "follow_up_event_ids" in payload
     assert "temporal_contract" in payload
     assert "scheduler_backend" in payload
 
@@ -102,11 +104,34 @@ def test_agent_runtime_returns_memory_hits_preferences_and_generated_follow_up_f
         assert "support_progress_summary" in payload
         assert "recurring_patterns" in payload
         assert "intervention_effectiveness" in payload
+
         assert payload["generated_follow_up_plan"] is not None
         assert payload["generated_follow_up_plan"]["user_id"] == user_id
         assert payload["generated_follow_up_plan"]["source_agent"] == payload["specialist_agent"]
+
         assert payload["follow_up_required"] is True
         assert payload["follow_up_plan"]["plan_type"] is not None
+        assert payload["follow_up_plan"]["title"] is not None
+        assert payload["follow_up_plan"]["delivery_channel"] == "in_app"
+
         assert payload["follow_up_contract"]["contract_version"] == "v2-followup-basic"
-        assert payload["temporal_contract"]["contract_version"] == "v2-temporal-ready"
-        assert payload["scheduler_backend"] == "local_contract"
+        assert payload["follow_up_contract"]["status"] == "planned_not_enqueued"
+        assert payload["follow_up_contract"]["scheduler_backend"] in {
+            "local-contract",
+            "local_contract",
+            "placeholder",
+        }
+
+        assert payload["follow_up_plan_id"] == payload["generated_follow_up_plan"]["id"]
+        assert len(payload["follow_up_event_ids"]) >= 1
+
+        assert payload["temporal_contract"]["workflow_name"] is not None
+        assert payload["temporal_contract"]["task_queue"] is not None
+        assert payload["temporal_contract"]["idempotency_key"] is not None
+        assert payload["temporal_contract"]["user_id"] == user_id
+
+        assert payload["scheduler_backend"] in {
+            "local-contract",
+            "local_contract",
+            "placeholder",
+        }

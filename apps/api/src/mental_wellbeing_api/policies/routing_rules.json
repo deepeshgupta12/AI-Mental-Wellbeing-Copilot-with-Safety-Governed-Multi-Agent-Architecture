@@ -1,0 +1,17 @@
+{
+  "version": "v2-10.0.0",
+  "intent_router": {
+    "sleep_hints": ["sleep", "insomnia", "rest", "night", "awake", "waking up"],
+    "social_hints": ["alone", "lonely", "friend", "friends", "family", "partner", "isolated", "who to talk to", "reach out"],
+    "habit_hints": ["routine", "habit", "habits", "consistency", "discipline", "practice", "self-care"],
+    "overwhelm_hints": ["overwhelmed", "stress", "stressed", "burnout", "heavy"],
+    "journaling_strong_hints": ["journal", "journaling", "what i wrote", "wrote in my journal"],
+    "journaling_reflection_hints": ["reflect", "reflection", "reflecting", "process my day", "process what i wrote"],
+    "cognitive_reframe_hints": ["always", "never", "should", "failure", "worthless", "ruin everything", "catastrophe", "catastrophizing"]
+  },
+  "support_mode_router": {
+    "behavioral_activation_hints": ["stuck", "no motivation", "can't start", "tired", "exhausted", "avoid", "procrastinating"],
+    "direct_style_values": ["direct", "structured", "action-oriented"],
+    "reflective_style_values": ["reflective", "soft", "calm", "minimal"]
+  }
+}

@@ -6,19 +6,7 @@ from mental_wellbeing_api.orchestration.runtime import (
     set_routing_contract,
 )
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
-
-BEHAVIORAL_ACTIVATION_HINTS = [
-    "stuck",
-    "no motivation",
-    "can't start",
-    "tired",
-    "exhausted",
-    "avoid",
-    "procrastinating",
-]
-
-DIRECT_STYLE_VALUES = {"direct", "structured", "action-oriented"}
-REFLECTIVE_STYLE_VALUES = {"reflective", "soft", "calm", "minimal"}
+from mental_wellbeing_api.prompts.registry import load_routing_rules, load_runtime_policy
 
 
 def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
@@ -30,9 +18,24 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
     emotion_label = state.get("emotion_label", "reflective")
     emotion_intensity = state.get("emotion_intensity", "low")
 
+    policy = load_runtime_policy()
+    routing_policy = policy.get("routing", {}) if isinstance(policy, dict) else {}
+    rules = load_routing_rules()
+    support_rules = rules.get("support_mode_router", {}) if isinstance(rules, dict) else {}
+
+    behavioral_activation_hints = list(
+        support_rules.get(
+            "behavioral_activation_hints",
+            routing_policy.get("behavioral_activation_hints", []),
+        )
+    )
+    direct_style_values = set(support_rules.get("direct_style_values", ["direct", "structured", "action-oriented"]))
+    reflective_style_values = set(support_rules.get("reflective_style_values", ["reflective", "soft", "calm", "minimal"]))
+    contract_name = str(routing_policy.get("contract_name", "v2-routing-core"))
+
     if risk_level == "medium":
         support_mode = "stabilize"
-        support_strategy = "distress_stabilization"
+        support_strategy = str(routing_policy.get("medium_risk_strategy", "distress_stabilization"))
         specialist_agent = "distress_stabilization"
         routing_reason = "medium-risk state prefers stabilization"
     elif intent_label == "sleep_recovery":
@@ -60,21 +63,21 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
         support_strategy = "habit_care_plan"
         specialist_agent = "habit_care_plan"
         routing_reason = "habit support intent selected"
-    elif any(hint in user_input for hint in BEHAVIORAL_ACTIVATION_HINTS):
+    elif any(hint in user_input for hint in behavioral_activation_hints):
         support_mode = "activate"
         support_strategy = "behavioral_activation"
         specialist_agent = "behavioral_activation"
         routing_reason = "behavioral activation cues detected"
-    elif support_style in DIRECT_STYLE_VALUES and emotion_label in {"exhaustion", "frustration"}:
+    elif support_style in direct_style_values and emotion_label in {"exhaustion", "frustration"}:
         support_mode = "activate"
         support_strategy = "behavioral_activation"
         specialist_agent = "behavioral_activation"
         routing_reason = "direct style matched with activation-friendly emotion"
     else:
         support_mode = "reflect"
-        support_strategy = "reflective"
+        support_strategy = str(routing_policy.get("default_strategy", "reflective"))
         specialist_agent = "reflective_support"
-        if support_style in REFLECTIVE_STYLE_VALUES or emotion_intensity == "low":
+        if support_style in reflective_style_values or emotion_intensity == "low":
             routing_reason = "reflective style preference matched"
         else:
             routing_reason = "default reflective pathway"
@@ -88,7 +91,7 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
     }
     state = set_routing_contract(
         state,
-        contract_name="v2-routing-core",
+        contract_name=contract_name,
         intent_label=intent_label,
         support_strategy=support_strategy,
         specialist_agent=specialist_agent,
@@ -102,6 +105,7 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
             "support_strategy": support_strategy,
             "specialist_agent": specialist_agent,
             "routing_reason": routing_reason,
+            "contract_name": contract_name,
         },
     )
     state = append_handoff(

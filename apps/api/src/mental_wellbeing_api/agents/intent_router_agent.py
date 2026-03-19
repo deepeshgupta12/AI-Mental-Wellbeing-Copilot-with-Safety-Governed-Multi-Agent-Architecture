@@ -6,47 +6,7 @@ from mental_wellbeing_api.orchestration.runtime import (
     set_routing_contract,
 )
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
-
-SLEEP_HINTS = ["sleep", "insomnia", "rest", "night", "awake", "waking up"]
-SOCIAL_HINTS = [
-    "alone",
-    "lonely",
-    "friend",
-    "friends",
-    "family",
-    "partner",
-    "isolated",
-    "who to talk to",
-    "reach out",
-]
-HABIT_HINTS = [
-    "routine",
-    "habit",
-    "habits",
-    "consistency",
-    "discipline",
-    "practice",
-    "self-care",
-]
-OVERWHELM_HINTS = ["overwhelmed", "stress", "stressed", "burnout", "heavy"]
-JOURNALING_STRONG_HINTS = ["journal", "journaling", "what i wrote", "wrote in my journal"]
-JOURNALING_REFLECTION_HINTS = [
-    "reflect",
-    "reflection",
-    "reflecting",
-    "process my day",
-    "process what i wrote",
-]
-COGNITIVE_REFRAME_HINTS = [
-    "always",
-    "never",
-    "should",
-    "failure",
-    "worthless",
-    "ruin everything",
-    "catastrophe",
-    "catastrophizing",
-]
+from mental_wellbeing_api.prompts.registry import load_routing_rules, load_runtime_policy
 
 
 def _contains_any(text: str, hints: list[str]) -> bool:
@@ -61,29 +21,44 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         ]
     ).lower()
 
-    if _contains_any(text, SLEEP_HINTS):
+    policy = load_runtime_policy()
+    routing_policy = policy.get("routing", {}) if isinstance(policy, dict) else {}
+    rules = load_routing_rules()
+    intent_rules = rules.get("intent_router", {}) if isinstance(rules, dict) else {}
+
+    sleep_hints = list(intent_rules.get("sleep_hints", []))
+    social_hints = list(intent_rules.get("social_hints", []))
+    habit_hints = list(intent_rules.get("habit_hints", []))
+    overwhelm_hints = list(intent_rules.get("overwhelm_hints", []))
+    journaling_strong_hints = list(intent_rules.get("journaling_strong_hints", []))
+    journaling_reflection_hints = list(intent_rules.get("journaling_reflection_hints", []))
+    cognitive_reframe_hints = list(intent_rules.get("cognitive_reframe_hints", []))
+
+    if _contains_any(text, sleep_hints):
         intent_label = "sleep_recovery"
         routing_reason = "sleep-oriented cues detected"
-    elif _contains_any(text, SOCIAL_HINTS):
+    elif _contains_any(text, social_hints):
         intent_label = "social_support"
         routing_reason = "social-support cues detected"
-    elif _contains_any(text, COGNITIVE_REFRAME_HINTS):
+    elif _contains_any(text, cognitive_reframe_hints):
         intent_label = "cognitive_reframing"
         routing_reason = "cognitive distortion or self-judgment cues detected"
-    elif _contains_any(text, HABIT_HINTS):
+    elif _contains_any(text, habit_hints):
         intent_label = "habit_support"
         routing_reason = "habit-building cues detected"
-    elif _contains_any(text, JOURNALING_STRONG_HINTS) or (
-        _contains_any(text, JOURNALING_REFLECTION_HINTS) and "journal" in text
+    elif _contains_any(text, journaling_strong_hints) or (
+        _contains_any(text, journaling_reflection_hints) and "journal" in text
     ):
         intent_label = "journaling_insight"
         routing_reason = "journaling or reflection-on-writing cues detected"
-    elif _contains_any(text, OVERWHELM_HINTS):
+    elif _contains_any(text, overwhelm_hints):
         intent_label = "stress_overwhelm"
         routing_reason = "stress or overwhelm cues detected"
     else:
-        intent_label = "general_reflection"
+        intent_label = str(routing_policy.get("default_intent", "general_reflection"))
         routing_reason = "default reflection pathway"
+
+    contract_name = str(routing_policy.get("contract_name", "v2-routing-core"))
 
     state = {
         **state,
@@ -92,7 +67,7 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     }
     state = set_routing_contract(
         state,
-        contract_name="v2-routing-core",
+        contract_name=contract_name,
         intent_label=intent_label,
         support_strategy=state.get("support_strategy", ""),
         specialist_agent=state.get("specialist_agent", ""),
@@ -104,6 +79,7 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         metadata={
             "intent_label": intent_label,
             "routing_reason": routing_reason,
+            "contract_name": contract_name,
         },
     )
     state = append_handoff(
