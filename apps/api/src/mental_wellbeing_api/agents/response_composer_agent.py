@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 from mental_wellbeing_api.prompts.registry import load_prompt
@@ -21,6 +23,18 @@ def _style_prefix(preference_signals: dict[str, str]) -> str:
     return ""
 
 
+def _format_follow_up_timing(follow_up_due_at: str | None) -> str | None:
+    if not follow_up_due_at:
+        return None
+
+    try:
+        normalized = follow_up_due_at.replace("Z", "+00:00")
+        parsed = datetime.fromisoformat(normalized)
+        return parsed.strftime("%b %d, %Y at %I:%M %p")
+    except ValueError:
+        return follow_up_due_at
+
+
 def _build_mock_final_response(state: AgentRuntimeState) -> str:
     specialist_response = state.get("specialist_response") or state.get("reflective_response", "")
     coping_recommendations = state.get("coping_recommendations", [])
@@ -31,6 +45,12 @@ def _build_mock_final_response(state: AgentRuntimeState) -> str:
     recurring_patterns = state.get("recurring_patterns", [])
     intervention_effectiveness = state.get("intervention_effectiveness", {})
     support_progress_summary = state.get("support_progress_summary")
+
+    follow_up_required = bool(state.get("follow_up_required", False))
+    follow_up_title = state.get("follow_up_plan_title")
+    follow_up_due_at = state.get("follow_up_due_at")
+    follow_up_delivery_channel = state.get("follow_up_delivery_channel")
+    scheduler_backend = state.get("scheduler_backend")
 
     parts: list[str] = []
 
@@ -58,7 +78,31 @@ def _build_mock_final_response(state: AgentRuntimeState) -> str:
 
     avg_effectiveness = intervention_effectiveness.get("avg_effectiveness_rating")
     if avg_effectiveness is not None:
-        parts.append(f"Intervention trend:\n- Average effectiveness so far: {avg_effectiveness}")
+        parts.append(
+            f"Intervention trend:\n- Average effectiveness so far: {avg_effectiveness}"
+        )
+
+    if follow_up_required:
+        follow_up_lines: list[str] = []
+
+        if follow_up_title:
+            follow_up_lines.append(f"Follow-up plan: {follow_up_title}.")
+        else:
+            follow_up_lines.append("Follow-up plan: Next continuity step prepared.")
+
+        readable_due_at = _format_follow_up_timing(follow_up_due_at)
+        if readable_due_at:
+            follow_up_lines.append(f"Reminder timing: {readable_due_at}.")
+        else:
+            follow_up_lines.append("Reminder timing: scheduled for the next check-in window.")
+
+        if follow_up_delivery_channel:
+            follow_up_lines.append(f"Delivery channel: {follow_up_delivery_channel}.")
+
+        if scheduler_backend:
+            follow_up_lines.append(f"Scheduler backend: {scheduler_backend}.")
+
+        parts.append("Follow-up:\n- " + "\n- ".join(follow_up_lines))
 
     if follow_up_suggestions:
         parts.append("Next:\n- " + follow_up_suggestions[0])
@@ -102,7 +146,11 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         state = append_execution_event(
             state,
             node_name="response_composer",
-            metadata={"mode": "mock_specialist_blend", "response_length": len(final_response)},
+            metadata={
+                "mode": "mock_specialist_blend",
+                "response_length": len(final_response),
+                "follow_up_required": bool(state.get("follow_up_required", False)),
+            },
         )
         state = append_handoff(
             state,
@@ -121,6 +169,7 @@ Keep it concise, calm, supportive, and clearly non-clinical.
 Prefer the specialist draft when present.
 Use coping recommendations, trend summaries, and follow-up suggestions selectively instead of repeating everything.
 Adapt the tone to the user's support-style preferences when available.
+If a follow-up plan exists, briefly mention the continuity step, reminder timing, and that the next step has been prepared.
 """,
     )
 
@@ -144,6 +193,11 @@ Adapt the tone to the user's support-style preferences when available.
         f"Coping recommendations:\n{state.get('coping_recommendations', [])}\n\n"
         f"Journaling insights:\n{state.get('journaling_insights', [])}\n\n"
         f"Follow-up suggestions:\n{state.get('follow_up_suggestions', [])}\n\n"
+        f"Follow-up required:\n{state.get('follow_up_required', False)}\n\n"
+        f"Follow-up plan title:\n{state.get('follow_up_plan_title', '')}\n\n"
+        f"Follow-up due at:\n{state.get('follow_up_due_at', '')}\n\n"
+        f"Follow-up delivery channel:\n{state.get('follow_up_delivery_channel', '')}\n\n"
+        f"Scheduler backend:\n{state.get('scheduler_backend', '')}\n\n"
         "Compose the final response."
     )
     final_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
@@ -155,7 +209,11 @@ Adapt the tone to the user's support-style preferences when available.
     state = append_execution_event(
         state,
         node_name="response_composer",
-        metadata={"mode": "standard", "response_length": len(final_response)},
+        metadata={
+            "mode": "standard",
+            "response_length": len(final_response),
+            "follow_up_required": bool(state.get("follow_up_required", False)),
+        },
     )
     state = append_handoff(
         state,
