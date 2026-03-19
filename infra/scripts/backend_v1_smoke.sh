@@ -76,6 +76,8 @@ PLAN_JSON=$(curl -s -X POST "$API_BASE/action-plans" \
   }")
 echo "$PLAN_JSON" | jq
 
+ACTION_PLAN_ID=$(echo "$PLAN_JSON" | jq -r '.id')
+
 echo
 echo "== List action plans =="
 curl -s "$API_BASE/action-plans?user_id=$USER_ID" | jq
@@ -109,12 +111,14 @@ echo "== Run agent runtime (normal) =="
 RUNTIME_JSON=$(curl -s -X POST "$API_BASE/agent-runtime/smoke" \
   -H "Content-Type: application/json" \
   -d "{
-    \"user_input\": \"I feel overwhelmed and exhausted after work.\",
+    \"user_input\": \"I feel overwhelmed and exhausted after work and need something practical tomorrow.\",
     \"provider\": \"mock\",
     \"user_id\": \"$USER_ID\"
   }")
 echo "$RUNTIME_JSON" | jq
+
 ASSISTANT_REPLY=$(echo "$RUNTIME_JSON" | jq -r '.final_response')
+GENERATED_FOLLOW_UP_PLAN_ID=$(echo "$RUNTIME_JSON" | jq -r '.generated_follow_up_plan.id // empty')
 
 echo
 echo "== Persist assistant reply into conversation =="
@@ -143,6 +147,50 @@ curl -s "$API_BASE/memory-trends/memory-summary?user_id=$USER_ID" | jq
 echo
 echo "== Trend summary =="
 curl -s "$API_BASE/memory-trends/trend-summary?user_id=$USER_ID" | jq
+
+echo
+echo "== Follow-up plans for user =="
+curl -s "$API_BASE/follow-ups/plans?user_id=$USER_ID" | jq
+
+if [ -n "$GENERATED_FOLLOW_UP_PLAN_ID" ]; then
+  echo
+  echo "== Create follow-up event =="
+  FOLLOW_UP_EVENT_JSON=$(curl -s -X POST "$API_BASE/follow-ups/events" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"follow_up_plan_id\": \"$GENERATED_FOLLOW_UP_PLAN_ID\",
+      \"user_id\": \"$USER_ID\",
+      \"event_type\": \"delivered\",
+      \"outcome_status\": \"sent\",
+      \"notes\": \"Smoke test reminder delivery.\",
+      \"event_payload_json\": {\"channel\": \"in_app\"}
+    }")
+  echo "$FOLLOW_UP_EVENT_JSON" | jq
+
+  echo
+  echo "== Follow-up events for generated plan =="
+  curl -s "$API_BASE/follow-ups/events?follow_up_plan_id=$GENERATED_FOLLOW_UP_PLAN_ID" | jq
+fi
+
+echo
+echo "== Admin trend overview =="
+curl -s "$API_BASE/admin/trend-overview" | jq
+
+echo
+echo "== Admin follow-up overview =="
+curl -s "$API_BASE/admin/follow-up-overview" | jq
+
+echo
+echo "== Admin follow-up plans =="
+curl -s "$API_BASE/admin/follow-up-plans" | jq
+
+echo
+echo "== Admin follow-up events =="
+curl -s "$API_BASE/admin/follow-up-events" | jq
+
+echo
+echo "== Admin policy config =="
+curl -s "$API_BASE/admin/policy-config" | jq
 
 echo
 echo "== Safety evaluate low risk =="

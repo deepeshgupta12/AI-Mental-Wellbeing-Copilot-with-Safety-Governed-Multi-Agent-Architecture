@@ -41,8 +41,54 @@ response:
   concise_style_default: true
   non_clinical_required: true
 
+followups:
+  enabled: true
+  scheduler_backend: local_contract
+  temporal_contract_enabled: false
+  workflow_family: follow_up_reminder
+  default_delivery_channel: in_app
+  overdue_threshold_hours: 2
+  default_delay_hours_by_support_mode:
+    plan: 24
+    activate: 18
+    reflect: 24
+    connect: 24
+    reframe: 24
+    recover: 12
+    stabilize: 6
+    default: 24
+  completion_outcomes:
+    - completed
+    - helpful
+    - acknowledged
+    - skipped
+    - cancelled
+    - failed
+  retry_policy:
+    max_attempts: 3
+    backoff_seconds: 300
+
+scheduling:
+  enabled: true
+  backend: local_contract
+  future_ready_temporal: true
+  enqueue_mode: contract_only
+  workflow_name_default: follow_up_reminder_workflow
+  task_queue_default: follow-up-reminders
+  idempotency_key_prefix: followup
+  reminder_delivery_defaults:
+    in_app:
+      enabled: true
+    email:
+      enabled: false
+    whatsapp:
+      enabled: false
+    internal:
+      enabled: true
+
 admin:
   flagged_sessions_enabled: true
   session_logs_enabled: true
   audit_view_enabled: true
   policy_view_enabled: true
+  follow_up_overview_enabled: true
