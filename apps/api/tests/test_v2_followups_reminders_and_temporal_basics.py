@@ -79,3 +79,35 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
 
         assert len(events_payload) >= 1
         assert events_payload[0]["follow_up_plan_id"] == generated_plan["id"]
+
+        admin_overview_response = client.get("/api/v1/admin/follow-up-overview")
+        assert admin_overview_response.status_code == 200
+        admin_overview_payload = admin_overview_response.json()
+
+        assert "total_follow_up_plans" in admin_overview_payload
+        assert "active_scheduled_plans" in admin_overview_payload
+        assert "completed_plans" in admin_overview_payload
+        assert "cancelled_plans" in admin_overview_payload
+        assert "overdue_plans" in admin_overview_payload
+        assert "failed_follow_up_events" in admin_overview_payload
+        assert "delivery_channel_breakdown" in admin_overview_payload
+        assert "scheduler_backend_breakdown" in admin_overview_payload
+        assert "upcoming_due_follow_ups" in admin_overview_payload
+        assert "recent_completion_outcomes" in admin_overview_payload
+        assert admin_overview_payload["total_follow_up_plans"] >= 1
+        assert admin_overview_payload["active_scheduled_plans"] >= 1
+        assert "in_app" in admin_overview_payload["delivery_channel_breakdown"]
+
+        admin_plans_response = client.get("/api/v1/admin/follow-up-plans")
+        assert admin_plans_response.status_code == 200
+        admin_plans_payload = admin_plans_response.json()
+
+        assert len(admin_plans_payload) >= 1
+        assert any(item["id"] == generated_plan["id"] for item in admin_plans_payload)
+
+        admin_events_response = client.get("/api/v1/admin/follow-up-events")
+        assert admin_events_response.status_code == 200
+        admin_events_payload = admin_events_response.json()
+
+        assert len(admin_events_payload) >= 1
+        assert any(item["follow_up_plan_id"] == generated_plan["id"] for item in admin_events_payload)
