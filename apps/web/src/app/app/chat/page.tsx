@@ -1,9 +1,18 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Lightbulb, ListChecks, Send, Sparkles, Wind } from "lucide-react";
+import {
+  AlertTriangle,
+  Lightbulb,
+  ListChecks,
+  Send,
+  ShieldAlert,
+  Sparkles,
+  Wind,
+} from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +29,7 @@ import {
   setCurrentConversationSessionId,
 } from "@/lib/demo-session";
 import { listSupportTracks } from "@/lib/support-tracks-api";
+import type { AgentRuntimeSmokeResponse } from "@/types/api";
 
 type LocalMode = "reflective" | "calming" | "problem-solving" | "planning";
 
@@ -45,6 +55,7 @@ function ChatPageContent() {
   const [currentMode, setCurrentMode] = useState<LocalMode>("reflective");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [supportTrack, setSupportTrack] = useState<string | null>(null);
+  const [latestRuntime, setLatestRuntime] = useState<AgentRuntimeSmokeResponse | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const supportTracksQuery = useQuery({
@@ -123,15 +134,16 @@ function ChatPageContent() {
 
       return runtimeResponse;
     },
-    onSuccess: async () => {
+    onSuccess: async (runtimeResponse) => {
       setInput("");
+      setLatestRuntime(runtimeResponse);
       await messagesQuery.refetch();
     },
   });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQuery.data, sendFlowMutation.isPending]);
+  }, [messagesQuery.data, sendFlowMutation.isPending, latestRuntime]);
 
   const handleSend = () => {
     if (!input.trim() || !sessionId || !userId) return;
@@ -140,6 +152,14 @@ function ChatPageContent() {
 
   const activeMode = modeLabels.find((m) => m.id === currentMode);
   const messages = messagesQuery.data ?? [];
+
+  const showCrisisBanner = useMemo(() => {
+    return (
+      latestRuntime?.risk_level === "high" ||
+      latestRuntime?.safety_override === true ||
+      latestRuntime?.requires_human_review === true
+    );
+  }, [latestRuntime]);
 
   return (
     <>
@@ -194,6 +214,36 @@ function ChatPageContent() {
           </div>
         </div>
 
+        {showCrisisBanner && (
+          <div className="border-b border-urgent/20 bg-urgent/5 px-4 py-3 md:px-6">
+            <div className="mx-auto flex max-w-2xl items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-urgent" strokeWidth={1.5} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-foreground">
+                  Immediate human support is recommended.
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  This conversation has entered a higher-risk support path. Please use the
+                  safety screen for crisis resources, grounding steps, and escalation guidance.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href="/app/safety">
+                    <Button size="sm" variant="hero">
+                      <ShieldAlert className="mr-1 h-4 w-4" />
+                      Open safety support
+                    </Button>
+                  </Link>
+                  <a href="tel:988">
+                    <Button size="sm" variant="soft">
+                      Call or text 988
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl space-y-1 px-4 py-6 md:px-6">
             {!isHydrated ? (
@@ -216,7 +266,9 @@ function ChatPageContent() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3 }}
-                    className={`rounded-lg px-4 py-4 ${msg.role === "assistant" ? "bg-muted/50" : ""}`}
+                    className={`rounded-lg px-4 py-4 ${
+                      msg.role === "assistant" ? "bg-muted/50" : ""
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
@@ -229,12 +281,25 @@ function ChatPageContent() {
                         {msg.role === "assistant" ? "A" : "Y"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm leading-relaxed text-foreground">{msg.content}</p>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                          {msg.content}
+                        </p>
                       </div>
                     </div>
                   </motion.div>
                 ))}
               </AnimatePresence>
+            )}
+
+            {latestRuntime?.human_summary && latestRuntime.requires_human_review && (
+              <div className="mt-3 rounded-lg border border-urgent/20 bg-card p-4 shadow-card">
+                <p className="text-xs font-medium uppercase tracking-wide text-urgent">
+                  Reviewable safety summary
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {latestRuntime.human_summary}
+                </p>
+              </div>
             )}
 
             {sendFlowMutation.isError && (

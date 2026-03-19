@@ -166,6 +166,19 @@ export type MemorySummary = {
   recent_journal_themes: string[];
 };
 
+export type TrendSeriesPoint = {
+  timestamp: string;
+  mood_score: number | null;
+  stress_score: number | null;
+  energy_score: number | null;
+  sleep_hours: number | null;
+};
+
+export type TriggerFrequencyPoint = {
+  trigger: string;
+  frequency: number;
+};
+
 export type TrendSummary = {
   user_id: string;
   total_check_ins: number;
@@ -244,6 +257,10 @@ export type SafetyEvaluationResponse = {
   safety_flag_type: string | null;
   safety_summary: string | null;
   safety_override: boolean;
+  requires_human_review?: boolean;
+  escalation_recommended?: boolean;
+  queue_status?: string | null;
+  review_priority?: string | null;
 };
 
 export type RecalledMemoryItem = {
@@ -336,6 +353,17 @@ export type AgentRuntimeSmokeResponse = {
   recurring_patterns: string[];
   intervention_effectiveness: Record<string, unknown>;
   trend_visualization: Record<string, unknown>;
+
+  requires_human_review?: boolean;
+  escalation_recommended?: boolean;
+  review_priority?: string | null;
+  queue_status?: string | null;
+  decision_path_label?: string | null;
+  human_summary?: string | null;
+  evidence_bundle?: Record<string, unknown>;
+  quality_checks?: Record<string, unknown>;
+  audit_snapshot?: Record<string, unknown>;
+  review_recommended?: boolean;
 
   follow_up_required?: boolean;
   follow_up_plan?: Record<string, unknown>;
@@ -514,22 +542,109 @@ export type AdminAuditItem = {
   occurred_at: string;
 };
 
+export type AdminSafetyEvent = {
+  id: string;
+  user_id: string;
+  session_id: string | null;
+  safety_flag_id: string | null;
+  event_type: string;
+  severity: string;
+  risk_level: string;
+  queue_status: string;
+  requires_human_review: boolean;
+  escalation_channel: string | null;
+  escalation_status: string;
+  title: string;
+  summary: string | null;
+  evidence_json?: Record<string, unknown> | null;
+  event_payload_json?: Record<string, unknown> | null;
+  detected_at: string;
+  assigned_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminSafetyReview = {
+  id: string;
+  safety_event_id: string;
+  safety_flag_id: string | null;
+  user_id: string;
+  session_id: string | null;
+  reviewer_id: string | null;
+  review_status: string;
+  resolution_type: string | null;
+  reviewer_note: string | null;
+  human_summary: string | null;
+  decision_rationale: string | null;
+  review_payload_json?: Record<string, unknown> | null;
+  escalation_required: boolean;
+  escalation_status: string | null;
+  reviewed_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminSafetyEventDetail = {
+  event: AdminSafetyEvent;
+  reviews: AdminSafetyReview[];
+};
+
+export type AdminSafetyReviewCreatePayload = {
+  reviewer_id?: string | null;
+  review_status: string;
+  reviewer_note?: string | null;
+  human_summary?: string | null;
+  decision_rationale?: string | null;
+  resolution_type?: string | null;
+  escalation_required?: boolean;
+  escalation_status?: string | null;
+  review_payload_json?: Record<string, unknown> | null;
+};
+
+export type AdminReviewerDashboard = {
+  total_events: number;
+  queued_events: number;
+  in_review_events: number;
+  resolved_events: number;
+  severity_breakdown: Record<string, number>;
+  escalation_status_breakdown: Record<string, number>;
+  recent_reviews: AdminSafetyReview[];
+};
+
+export type AdminEscalationAnalytics = {
+  total_events: number;
+  escalated_events: number;
+  high_risk_events: number;
+  critical_events: number;
+  event_type_breakdown: Record<string, number>;
+};
+
+export type AdminAuditLog = {
+  id: string;
+  event_type: string;
+  entity_type: string;
+  entity_id: string;
+  user_id: string | null;
+  session_id: string | null;
+  safety_event_id: string | null;
+  safety_review_id: string | null;
+  actor_type: string;
+  actor_id: string | null;
+  title: string;
+  details: string | null;
+  before_json?: Record<string, unknown> | null;
+  after_json?: Record<string, unknown> | null;
+  event_payload_json?: Record<string, unknown> | null;
+  is_immutable: boolean;
+  occurred_at: string;
+  created_at: string;
+};
+
 export type SupportTrack = {
   id: string;
   title: string;
   description: string;
   suggested_prompt: string;
-};
-
-export type TrendSeriesPoint = {
-  timestamp: string;
-  mood_score: number | null;
-  stress_score: number | null;
-  energy_score: number | null;
-  sleep_hours: number | null;
-};
-
-export type TriggerFrequencyPoint = {
-  trigger: string;
-  frequency: number;
 };

@@ -2,16 +2,23 @@ import { apiRequest } from "@/lib/api-client";
 import type {
   AdminAnalyticsOverview,
   AdminAuditItem,
+  AdminAuditLog,
   AdminConfigAudit,
   AdminConfigDiff,
   AdminConfigVersion,
+  AdminEscalationAnalytics,
   AdminFlaggedSession,
   AdminFlaggedSessionDetail,
   AdminInterventionLog,
   AdminInterventionOverview,
   AdminOpsOverview,
   AdminPolicyConfig,
+  AdminReviewerDashboard,
   AdminRoutingRulesResponse,
+  AdminSafetyEvent,
+  AdminSafetyEventDetail,
+  AdminSafetyReview,
+  AdminSafetyReviewCreatePayload,
   AdminTraceExecutionDetail,
   AdminTraceExecutionSummary,
   AdminTraceItem,
@@ -41,8 +48,12 @@ export function getAdminAgentTraceExecutions(): Promise<AdminTraceExecutionSumma
   return apiRequest<AdminTraceExecutionSummary[]>("/api/v1/admin/agent-trace-executions");
 }
 
-export function getAdminAgentTraceExecutionDetail(traceName: string): Promise<AdminTraceExecutionDetail> {
-  return apiRequest<AdminTraceExecutionDetail>(`/api/v1/admin/agent-trace-executions/${encodeURIComponent(traceName)}`);
+export function getAdminAgentTraceExecutionDetail(
+  traceName: string,
+): Promise<AdminTraceExecutionDetail> {
+  return apiRequest<AdminTraceExecutionDetail>(
+    `/api/v1/admin/agent-trace-executions/${encodeURIComponent(traceName)}`,
+  );
 }
 
 export function getAdminInterventionLogs(): Promise<AdminInterventionLog[]> {
@@ -57,7 +68,10 @@ export function getAdminRoutingRules(): Promise<AdminRoutingRulesResponse> {
   return apiRequest<AdminRoutingRulesResponse>("/api/v1/admin/routing-rules");
 }
 
-export function updateAdminRoutingRules(payloadJson: Record<string, unknown>, changeNote?: string | null): Promise<AdminConfigVersion> {
+export function updateAdminRoutingRules(
+  payloadJson: Record<string, unknown>,
+  changeNote?: string | null,
+): Promise<AdminConfigVersion> {
   return apiRequest<AdminConfigVersion>("/api/v1/admin/routing-rules", {
     method: "PUT",
     body: JSON.stringify({
@@ -76,7 +90,10 @@ export function getAdminPromptRegistryVersions(): Promise<AdminConfigVersion[]> 
   return apiRequest<AdminConfigVersion[]>("/api/v1/admin/prompt-registry/versions");
 }
 
-export function updateAdminRuntimePolicy(payloadJson: Record<string, unknown>, changeNote?: string | null): Promise<AdminConfigVersion> {
+export function updateAdminRuntimePolicy(
+  payloadJson: Record<string, unknown>,
+  changeNote?: string | null,
+): Promise<AdminConfigVersion> {
   return apiRequest<AdminConfigVersion>("/api/v1/admin/runtime-policy", {
     method: "PUT",
     body: JSON.stringify({
@@ -87,7 +104,10 @@ export function updateAdminRuntimePolicy(payloadJson: Record<string, unknown>, c
   });
 }
 
-export function updateAdminPromptRegistry(payloadJson: Record<string, unknown>, changeNote?: string | null): Promise<AdminConfigVersion> {
+export function updateAdminPromptRegistry(
+  payloadJson: Record<string, unknown>,
+  changeNote?: string | null,
+): Promise<AdminConfigVersion> {
   return apiRequest<AdminConfigVersion>("/api/v1/admin/prompt-registry", {
     method: "PUT",
     body: JSON.stringify({
@@ -103,7 +123,11 @@ export function getAdminConfigAudit(configKey?: string): Promise<AdminConfigAudi
   return apiRequest<AdminConfigAudit[]>(`/api/v1/admin/config-audit${query}`);
 }
 
-export function getAdminConfigDiff(configKey: string, fromVersionId: string, toVersionId: string): Promise<AdminConfigDiff> {
+export function getAdminConfigDiff(
+  configKey: string,
+  fromVersionId: string,
+  toVersionId: string,
+): Promise<AdminConfigDiff> {
   const params = new URLSearchParams({
     config_key: configKey,
     from_version_id: fromVersionId,
@@ -118,4 +142,54 @@ export function getAdminOpsOverview(): Promise<AdminOpsOverview> {
 
 export function getAdminAnalyticsOverview(): Promise<AdminAnalyticsOverview> {
   return apiRequest<AdminAnalyticsOverview>("/api/v1/admin/analytics/overview");
+}
+
+export function getAdminSafetyEvents(params?: {
+  queueStatus?: string;
+  riskLevel?: string;
+}): Promise<AdminSafetyEvent[]> {
+  const search = new URLSearchParams();
+  if (params?.queueStatus) search.set("queue_status", params.queueStatus);
+  if (params?.riskLevel) search.set("risk_level", params.riskLevel);
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiRequest<AdminSafetyEvent[]>(`/api/v1/admin/safety-events${suffix}`);
+}
+
+export function getAdminSafetyEventDetail(
+  safetyEventId: string,
+): Promise<AdminSafetyEventDetail> {
+  return apiRequest<AdminSafetyEventDetail>(`/api/v1/admin/safety-events/${safetyEventId}`);
+}
+
+export function getAdminSafetyEventReviews(
+  safetyEventId: string,
+): Promise<AdminSafetyReview[]> {
+  return apiRequest<AdminSafetyReview[]>(
+    `/api/v1/admin/safety-events/${safetyEventId}/reviews`,
+  );
+}
+
+export function createAdminSafetyEventReview(
+  safetyEventId: string,
+  payload: AdminSafetyReviewCreatePayload,
+): Promise<AdminSafetyReview> {
+  return apiRequest<AdminSafetyReview>(
+    `/api/v1/admin/safety-events/${safetyEventId}/reviews`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function getAdminReviewerDashboard(): Promise<AdminReviewerDashboard> {
+  return apiRequest<AdminReviewerDashboard>("/api/v1/admin/reviewer-dashboard");
+}
+
+export function getAdminEscalationAnalytics(): Promise<AdminEscalationAnalytics> {
+  return apiRequest<AdminEscalationAnalytics>("/api/v1/admin/escalation-analytics");
+}
+
+export function getAdminAuditTimeline(): Promise<AdminAuditLog[]> {
+  return apiRequest<AdminAuditLog[]>("/api/v1/admin/audit-timeline");
 }
