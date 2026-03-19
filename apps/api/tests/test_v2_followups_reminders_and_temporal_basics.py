@@ -41,7 +41,7 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
         assert generated_plan["user_id"] == user_id
         assert generated_plan["plan_type"] == "plan"
         assert generated_plan["delivery_channel"] == "in_app"
-        assert generated_plan["status"] == "pending"
+        assert generated_plan["status"] == "planned"
         assert generated_plan["scheduled_for"] is not None
         assert generated_plan["scheduling_contract_json"]["contract_version"] == "v2-followup-basic"
         assert generated_plan["scheduling_contract_json"]["status"] == "planned_not_enqueued"
