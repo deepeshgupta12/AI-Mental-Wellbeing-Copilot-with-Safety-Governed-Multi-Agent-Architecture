@@ -17,6 +17,7 @@ from mental_wellbeing_api.core.logging import configure_logging
 from mental_wellbeing_api.core.telemetry import telemetry_span
 from mental_wellbeing_api.db.session import get_engine
 from mental_wellbeing_api.services.redis_client import get_redis_client
+from mental_wellbeing_api.temporal.worker import TemporalWorkerRuntime
 
 logger = structlog.get_logger("mental_wellbeing_api")
 
@@ -25,7 +26,13 @@ logger = structlog.get_logger("mental_wellbeing_api")
 async def lifespan(_: FastAPI):
     settings = get_settings()
     configure_logging(settings.log_level)
+
+    worker_runtime = TemporalWorkerRuntime()
+    await worker_runtime.start()
+
     yield
+
+    await worker_runtime.stop()
     await get_engine().dispose()
     await get_redis_client().aclose()
 

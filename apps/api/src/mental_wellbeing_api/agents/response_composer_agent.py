@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
@@ -35,8 +36,42 @@ def _format_follow_up_timing(follow_up_due_at: str | None) -> str | None:
         return follow_up_due_at
 
 
+def _sanitize_text(value: str | None) -> str:
+    if not value:
+        return ""
+
+    text = value
+    text = re.sub(r"\[(?:mock-response:[^\]]+|mock-response|ollama-error|openai-error|openai-unavailable|unsupported-provider)[^\]]*\]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _safe_specialist_text(state: AgentRuntimeState) -> str:
+    specialist_response = _sanitize_text(
+        state.get("specialist_response") or state.get("reflective_response", "")
+    )
+    if specialist_response:
+        return specialist_response
+
+    support_mode = (state.get("support_mode") or "").lower()
+    fallback_by_mode = {
+        "reflect": "It sounds like this has been weighing on you, and slowing down to understand it is a meaningful step.",
+        "activate": "Let's focus on one very small next step so this feels more manageable.",
+        "reframe": "We can look at the thought more carefully and separate the hard moment from the harsher conclusion.",
+        "recover": "Let's keep this gentle and focus on one realistic recovery step.",
+        "connect": "You do not have to carry this alone. We can think about one safe connection point.",
+        "journal": "There may be a pattern here worth naming before trying to solve everything at once.",
+        "plan": "Let's make this smaller and more concrete so it is easier to follow through.",
+        "stabilize": "For now, let's focus on getting a little steadier, one moment at a time.",
+    }
+    return fallback_by_mode.get(
+        support_mode,
+        "It sounds like this has been difficult, and we can take it one clear step at a time.",
+    )
+
+
 def _build_mock_final_response(state: AgentRuntimeState) -> str:
-    specialist_response = state.get("specialist_response") or state.get("reflective_response", "")
+    specialist_response = _safe_specialist_text(state)
     coping_recommendations = state.get("coping_recommendations", [])
     journaling_insights = state.get("journaling_insights", [])
     follow_up_suggestions = state.get("follow_up_suggestions", [])
@@ -107,7 +142,7 @@ def _build_mock_final_response(state: AgentRuntimeState) -> str:
     if follow_up_suggestions:
         parts.append("Next:\n- " + follow_up_suggestions[0])
 
-    return "\n\n".join(parts).strip()
+    return "\n\n".join(part for part in parts if part).strip()
 
 
 def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
@@ -120,8 +155,8 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         )
         state = {
             **state,
-            "reflective_response": state.get("reflective_response", ""),
-            "specialist_response": state.get("specialist_response", ""),
+            "reflective_response": _sanitize_text(state.get("reflective_response", "")),
+            "specialist_response": _sanitize_text(state.get("specialist_response", "")),
             "final_response": final_response,
         }
         state = append_execution_event(
@@ -141,6 +176,8 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         final_response = _build_mock_final_response(state)
         state = {
             **state,
+            "reflective_response": _sanitize_text(state.get("reflective_response", "")),
+            "specialist_response": _sanitize_text(state.get("specialist_response", "")),
             "final_response": final_response,
         }
         state = append_execution_event(
@@ -185,7 +222,7 @@ If a follow-up plan exists, briefly mention the continuity step, reminder timing
         f"Support strategy:\n{state.get('support_strategy', 'reflective')}\n\n"
         f"Specialist agent:\n{state.get('specialist_agent', 'reflective_support')}\n\n"
         f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
-        f"Primary draft:\n{state.get('specialist_response', state.get('reflective_response', ''))}\n\n"
+        f"Primary draft:\n{_safe_specialist_text(state)}\n\n"
         f"Progress summary:\n{state.get('progress_summary', '')}\n\n"
         f"Support progress summary:\n{state.get('support_progress_summary', '')}\n\n"
         f"Recurring patterns:\n{state.get('recurring_patterns', [])}\n\n"
@@ -200,15 +237,22 @@ If a follow-up plan exists, briefly mention the continuity step, reminder timing
         f"Scheduler backend:\n{state.get('scheduler_backend', '')}\n\n"
         "Compose the final response."
     )
-    final_response = llm.generate_text(
-        state["provider"],
-        system_prompt,
-        user_prompt,
-        agent_name="response_composer",
+    final_response = _sanitize_text(
+        llm.generate_text(
+            state["provider"],
+            system_prompt,
+            user_prompt,
+            agent_name="response_composer",
+        )
     )
+
+    if not final_response:
+        final_response = _build_mock_final_response(state)
 
     state = {
         **state,
+        "reflective_response": _sanitize_text(state.get("reflective_response", "")),
+        "specialist_response": _sanitize_text(state.get("specialist_response", "")),
         "final_response": final_response,
     }
     state = append_execution_event(

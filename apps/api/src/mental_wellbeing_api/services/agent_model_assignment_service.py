@@ -10,8 +10,12 @@ class AgentModelAssignmentService:
         self.policy = load_runtime_policy()
 
     def resolve(self, *, provider: str, agent_name: str | None) -> dict[str, Any]:
-        normalized_provider = provider.strip().lower()
+        normalized_provider = (provider or "").strip().lower() or "mock"
         assignments = self.policy.get("models", {}).get("agent_assignments", {})
+
+        # Never override explicit mock mode with agent-level provider assignments.
+        if normalized_provider == "mock":
+            return {"provider": "mock", "model": None}
 
         if not agent_name:
             return {"provider": normalized_provider, "model": None}
@@ -21,6 +25,6 @@ class AgentModelAssignmentService:
         assigned_model = config.get("model")
 
         return {
-            "provider": assigned_provider,
+            "provider": assigned_provider or normalized_provider,
             "model": assigned_model,
         }
