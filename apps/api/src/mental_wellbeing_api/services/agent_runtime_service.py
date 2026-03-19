@@ -154,6 +154,9 @@ class AgentRuntimeService:
         trend_bundle: dict = {}
         generated_follow_up_plan = None
         follow_up_event_ids: list[str] = []
+        resolved_follow_up_contract: dict = {}
+        resolved_temporal_contract: dict = {}
+        resolved_scheduler_backend: str | None = None
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
@@ -278,6 +281,16 @@ class AgentRuntimeService:
                 )
                 generated_follow_up_plan = FollowUpPlanResponse.model_validate(created_plan)
 
+                resolved_follow_up_contract = generated_follow_up_plan.scheduling_contract_json or {}
+                resolved_temporal_contract = {}
+                if isinstance(resolved_follow_up_contract, dict):
+                    temporal_payload = resolved_follow_up_contract.get("temporal_contract")
+                    if isinstance(temporal_payload, dict):
+                        resolved_temporal_contract = temporal_payload
+                    scheduler_backend_value = resolved_follow_up_contract.get("scheduler_backend")
+                    if isinstance(scheduler_backend_value, str) and scheduler_backend_value.strip():
+                        resolved_scheduler_backend = scheduler_backend_value
+
                 created_event = await self.follow_up_service.create_event(
                     follow_up_plan_id=created_plan.id,
                     user_id=user_id,
@@ -285,9 +298,9 @@ class AgentRuntimeService:
                     outcome_status="planned",
                     notes="Runtime-generated follow up plan scheduled.",
                     event_payload_json={
-                        "scheduler_backend": result.get("scheduler_backend"),
+                        "scheduler_backend": resolved_scheduler_backend or result.get("scheduler_backend"),
                         "follow_up_due_at": result.get("follow_up_due_at"),
-                        "temporal_contract": result.get("temporal_contract", {}),
+                        "temporal_contract": resolved_temporal_contract or result.get("temporal_contract", {}),
                     },
                 )
                 follow_up_event_ids = [created_event.id]
@@ -346,11 +359,11 @@ class AgentRuntimeService:
             trend_visualization=result.get("trend_visualization", {}),
             follow_up_required=bool(result.get("follow_up_required", False)),
             follow_up_plan=self._build_follow_up_plan_preview(result),
-            follow_up_contract=result.get("follow_up_contract", {}),
+            follow_up_contract=resolved_follow_up_contract or result.get("follow_up_contract", {}),
             follow_up_plan_id=generated_follow_up_plan.id if generated_follow_up_plan else result.get("follow_up_plan_id"),
             follow_up_event_ids=follow_up_event_ids or result.get("follow_up_event_ids", []),
-            temporal_contract=result.get("temporal_contract", {}),
-            scheduler_backend=result.get("scheduler_backend"),
+            temporal_contract=resolved_temporal_contract or result.get("temporal_contract", {}),
+            scheduler_backend=resolved_scheduler_backend or result.get("scheduler_backend"),
             generated_follow_up_plan=generated_follow_up_plan,
             memory_hits=[
                 RecalledMemoryItemResponse(
