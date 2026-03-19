@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep
@@ -16,23 +15,14 @@ from mental_wellbeing_api.api.utils import (
 from mental_wellbeing_api.schemas.follow_up import (
     FollowUpEventCreateRequest,
     FollowUpEventResponse,
+    FollowUpPlanActionRequest,
     FollowUpPlanCreateRequest,
     FollowUpPlanResponse,
+    FollowUpPlanUpdateRequest,
 )
 from mental_wellbeing_api.services.follow_up_service import FollowUpService
 
 router = APIRouter(prefix="/follow-ups", tags=["follow-ups"])
-
-
-class FollowUpPlanStatusPatchRequest(BaseModel):
-    status: str
-    notes: str | None = None
-    outcome_status: str | None = None
-
-
-class FollowUpPlanActionRequest(BaseModel):
-    notes: str | None = None
-    outcome_status: str | None = None
 
 
 @router.post("/plans", response_model=FollowUpPlanResponse)
@@ -60,12 +50,8 @@ async def create_follow_up_plan(
         delivery_channel=payload.delivery_channel,
         timezone_name=payload.timezone,
         support_mode=payload.metadata_json.get("support_mode") if payload.metadata_json else None,
-        support_strategy=payload.metadata_json.get("support_strategy")
-        if payload.metadata_json
-        else None,
-        specialist_agent=payload.metadata_json.get("specialist_agent")
-        if payload.metadata_json
-        else None,
+        support_strategy=payload.metadata_json.get("support_strategy") if payload.metadata_json else None,
+        specialist_agent=payload.metadata_json.get("specialist_agent") if payload.metadata_json else None,
         metadata=payload.metadata_json,
     )
     return item
@@ -95,19 +81,23 @@ async def get_follow_up_plan(
 
 
 @router.patch("/plans/{follow_up_plan_id}", response_model=FollowUpPlanResponse)
-async def patch_follow_up_plan(
+async def update_follow_up_plan(
     follow_up_plan_id: UUID,
-    payload: FollowUpPlanStatusPatchRequest,
+    payload: FollowUpPlanUpdateRequest,
     session: AsyncSession = Depends(db_session_dep),
 ) -> FollowUpPlanResponse:
     await ensure_follow_up_plan_exists(session, str(follow_up_plan_id))
     service = FollowUpService(session)
-    return await service.update_plan_status(
-        follow_up_plan_id=str(follow_up_plan_id),
-        status=payload.status,
-        notes=payload.notes,
-        outcome_status=payload.outcome_status,
-    )
+    try:
+        return await service.update_plan(
+            follow_up_plan_id=str(follow_up_plan_id),
+            status=payload.status,
+            scheduled_for=payload.scheduled_for,
+            timezone_name=payload.timezone,
+            metadata_json=payload.metadata_json,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/plans/{follow_up_plan_id}/complete", response_model=FollowUpPlanResponse)
@@ -118,11 +108,14 @@ async def complete_follow_up_plan(
 ) -> FollowUpPlanResponse:
     await ensure_follow_up_plan_exists(session, str(follow_up_plan_id))
     service = FollowUpService(session)
-    return await service.complete_plan(
-        follow_up_plan_id=str(follow_up_plan_id),
-        notes=payload.notes,
-        outcome_status=payload.outcome_status or "completed",
-    )
+    try:
+        return await service.complete_plan(
+            follow_up_plan_id=str(follow_up_plan_id),
+            notes=payload.notes,
+            outcome_status=payload.outcome_status or "completed",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/plans/{follow_up_plan_id}/cancel", response_model=FollowUpPlanResponse)
@@ -133,11 +126,14 @@ async def cancel_follow_up_plan(
 ) -> FollowUpPlanResponse:
     await ensure_follow_up_plan_exists(session, str(follow_up_plan_id))
     service = FollowUpService(session)
-    return await service.cancel_plan(
-        follow_up_plan_id=str(follow_up_plan_id),
-        notes=payload.notes,
-        outcome_status=payload.outcome_status or "cancelled",
-    )
+    try:
+        return await service.cancel_plan(
+            follow_up_plan_id=str(follow_up_plan_id),
+            notes=payload.notes,
+            outcome_status=payload.outcome_status or "cancelled",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/events", response_model=FollowUpEventResponse)
