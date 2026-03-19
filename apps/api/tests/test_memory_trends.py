@@ -100,3 +100,7 @@ def test_memory_and_trend_basics() -> None:
         assert "latest_snapshot_created_at" in trend_payload
         assert "top_journal_themes" in trend_payload
         assert "recurring_trigger_count" in trend_payload
+        assert "support_progress_summary" in trend_payload
+        assert "recurring_patterns" in trend_payload
+        assert "intervention_effectiveness" in trend_payload
+        assert "trend_visualization" in trend_payload

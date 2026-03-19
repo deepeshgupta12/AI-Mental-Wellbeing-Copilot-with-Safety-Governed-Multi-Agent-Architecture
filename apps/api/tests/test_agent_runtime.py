@@ -31,6 +31,10 @@ def test_agent_runtime_smoke() -> None:
     assert "node_trace" in payload
     assert "handoff_history" in payload
     assert "routing_contract" in payload
+    assert "trend_summary" in payload
+    assert "support_progress_summary" in payload
+    assert "recurring_patterns" in payload
+    assert "intervention_effectiveness" in payload
 
 
 def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> None:
@@ -88,3 +92,7 @@ def test_agent_runtime_returns_memory_hits_and_preferences_for_known_user() -> N
             "preference",
             "semantic",
         }
+        assert "trend_summary" in payload
+        assert "support_progress_summary" in payload
+        assert "recurring_patterns" in payload
+        assert "intervention_effectiveness" in payload

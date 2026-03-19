@@ -22,6 +22,7 @@ from mental_wellbeing_api.services.safety_service import (
     SafetyEvaluationResponse,
     SafetyService,
 )
+from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 
 class AgentRuntimeService:
@@ -31,6 +32,7 @@ class AgentRuntimeService:
         self.safety_service = SafetyService()
         self.memory_service = MemoryService(session)
         self.preference_service = PreferenceService(session)
+        self.trend_service = TrendIntelligenceService(session)
 
     async def evaluate_safety_only(
         self,
@@ -136,6 +138,7 @@ class AgentRuntimeService:
         recalled_memory_items: list[MemoryRecallItem] = []
         preference_signals: dict[str, str] = {}
         what_helped_before: list[str] = []
+        trend_bundle: dict = {}
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
@@ -157,6 +160,8 @@ class AgentRuntimeService:
                     memory_kinds=["helpful_strategy", "preference"],
                     preference_signals=preference_signals,
                 )
+
+                trend_bundle = await self.trend_service.build_runtime_trend_bundle(user_id=user_id)
 
                 await self._log_memory_trace(
                     user_id=user_id,
@@ -188,10 +193,17 @@ class AgentRuntimeService:
                     for item in recalled_memory_items
                 ],
                 "preference_signals": preference_signals,
+                "learned_preferences": {},
                 "what_helped_before": what_helped_before,
                 "coping_recommendations": [],
                 "journaling_insights": [],
                 "follow_up_suggestions": [],
+                "progress_summary": trend_bundle.get("progress_summary"),
+                "support_progress_summary": trend_bundle.get("support_progress_summary"),
+                "trend_summary": None,
+                "recurring_patterns": trend_bundle.get("recurring_patterns", []),
+                "intervention_effectiveness": trend_bundle.get("intervention_effectiveness", {}),
+                "trend_visualization": trend_bundle.get("trend_visualization", {}),
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
@@ -258,6 +270,12 @@ class AgentRuntimeService:
             coping_recommendations=result.get("coping_recommendations", []),
             journaling_insights=result.get("journaling_insights", []),
             follow_up_suggestions=result.get("follow_up_suggestions", []),
+            progress_summary=result.get("progress_summary"),
+            support_progress_summary=result.get("support_progress_summary"),
+            trend_summary=result.get("trend_summary"),
+            recurring_patterns=result.get("recurring_patterns", []),
+            intervention_effectiveness=result.get("intervention_effectiveness", {}),
+            trend_visualization=result.get("trend_visualization", {}),
             memory_hits=[
                 RecalledMemoryItemResponse(
                     source_type=item.source_type,

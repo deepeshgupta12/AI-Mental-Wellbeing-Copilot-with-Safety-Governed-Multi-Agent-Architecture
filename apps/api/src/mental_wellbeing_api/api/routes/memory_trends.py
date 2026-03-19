@@ -22,6 +22,7 @@ from mental_wellbeing_api.schemas.memory_trends import (
     TrendSummaryResponse,
 )
 from mental_wellbeing_api.services.preference_service import PreferenceService
+from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 router = APIRouter(prefix="/memory-trends", tags=["memory-trends"])
 
@@ -296,6 +297,10 @@ async def get_trend_summary(
         or 0
     )
 
+    trend_bundle = await TrendIntelligenceService(session).build_runtime_trend_bundle(
+        user_id=str(user_id)
+    )
+
     return TrendSummaryResponse(
         user_id=str(user_id),
         total_check_ins=int(check_in_stats[0] or 0),
@@ -313,4 +318,8 @@ async def get_trend_summary(
         latest_snapshot_created_at=latest_snapshot.created_at if latest_snapshot else None,
         top_journal_themes=[row.theme_name for row in top_theme_rows],
         recurring_trigger_count=recurring_trigger_count,
+        support_progress_summary=trend_bundle.get("support_progress_summary"),
+        recurring_patterns=trend_bundle.get("recurring_patterns", []),
+        intervention_effectiveness=trend_bundle.get("intervention_effectiveness", {}),
+        trend_visualization=trend_bundle.get("trend_visualization", {}),
     )
