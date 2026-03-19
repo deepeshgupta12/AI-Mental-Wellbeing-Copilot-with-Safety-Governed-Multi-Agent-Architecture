@@ -7,6 +7,10 @@ from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.services.follow_up_contract_service import FollowUpContractService
 from mental_wellbeing_api.services.temporal_contract_service import TemporalContractService
+from mental_wellbeing_api.temporal.client import get_temporal_client
+from mental_wellbeing_api.temporal.workflows.follow_up_workflow import (
+    FollowUpReminderWorkflow,
+)
 
 
 class SchedulerService:
@@ -79,6 +83,17 @@ class SchedulerService:
             specialist_agent=specialist_agent,
         )
 
+        if settings.temporal_enabled and settings.scheduler_backend == "temporal":
+            client = await get_temporal_client()
+            await client.start_workflow(
+                FollowUpReminderWorkflow.run,
+                temporal_contract,
+                id=temporal_contract["workflow_id"],
+                task_queue=settings.temporal_task_queue,
+            )
+            temporal_contract["status"] = "enqueued"
+            plan.status = "scheduled"
+
         plan.scheduling_contract_json = {
             **(plan.scheduling_contract_json or {}),
             "scheduler_backend": settings.scheduler_backend,
@@ -91,7 +106,7 @@ class SchedulerService:
             follow_up_plan_id=plan.id,
             user_id=user_id,
             event_type="scheduled",
-            outcome_status="planned",
+            outcome_status=plan.status,
             notes="Follow up plan scheduled via scheduler service.",
             event_payload_json={
                 "scheduler_backend": settings.scheduler_backend,
