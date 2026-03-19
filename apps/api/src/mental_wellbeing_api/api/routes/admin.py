@@ -13,7 +13,9 @@ from mental_wellbeing_api.schemas.admin import (
     AdminFlaggedSessionResponse,
     AdminPolicyConfigResponse,
     AdminSessionLogResponse,
+    AdminTrendOverviewResponse,
 )
+from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -169,3 +171,11 @@ async def get_policy_config() -> AdminPolicyConfigResponse:
         runtime_policy=load_runtime_policy(),
         prompt_registry=load_prompt_registry(),
     )
+
+
+@router.get("/trend-overview", response_model=AdminTrendOverviewResponse)
+async def get_trend_overview(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminTrendOverviewResponse:
+    payload = await TrendIntelligenceService(session).build_admin_trend_overview()
+    return AdminTrendOverviewResponse(**payload)

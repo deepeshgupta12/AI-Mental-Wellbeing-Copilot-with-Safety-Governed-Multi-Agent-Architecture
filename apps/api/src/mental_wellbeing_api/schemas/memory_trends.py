@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -44,3 +45,7 @@ class TrendSummaryResponse(BaseModel):
     latest_snapshot_created_at: datetime | None = None
     top_journal_themes: list[str] = Field(default_factory=list)
     recurring_trigger_count: int = 0
+    support_progress_summary: str | None = None
+    recurring_patterns: list[str] = Field(default_factory=list)
+    intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
+    trend_visualization: dict[str, Any] = Field(default_factory=dict)

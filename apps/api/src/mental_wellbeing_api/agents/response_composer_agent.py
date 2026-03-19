@@ -27,6 +27,10 @@ def _build_mock_final_response(state: AgentRuntimeState) -> str:
     journaling_insights = state.get("journaling_insights", [])
     follow_up_suggestions = state.get("follow_up_suggestions", [])
     preference_signals = state.get("preference_signals", {})
+    progress_summary = state.get("progress_summary")
+    recurring_patterns = state.get("recurring_patterns", [])
+    intervention_effectiveness = state.get("intervention_effectiveness", {})
+    support_progress_summary = state.get("support_progress_summary")
 
     parts: list[str] = []
 
@@ -37,11 +41,24 @@ def _build_mock_final_response(state: AgentRuntimeState) -> str:
     if specialist_response:
         parts.append(specialist_response)
 
+    if progress_summary:
+        parts.append(f"Progress:\n- {progress_summary}")
+
+    if support_progress_summary:
+        parts.append(f"Support summary:\n- {support_progress_summary}")
+
+    if recurring_patterns:
+        parts.append("Patterns:\n- " + "\n- ".join(recurring_patterns[:2]))
+
     if coping_recommendations:
         parts.append("Suggestions:\n- " + "\n- ".join(coping_recommendations[:2]))
 
     if journaling_insights:
         parts.append("Insight:\n- " + "\n- ".join(journaling_insights[:2]))
+
+    avg_effectiveness = intervention_effectiveness.get("avg_effectiveness_rating")
+    if avg_effectiveness is not None:
+        parts.append(f"Intervention trend:\n- Average effectiveness so far: {avg_effectiveness}")
 
     if follow_up_suggestions:
         parts.append("Next:\n- " + follow_up_suggestions[0])
@@ -102,7 +119,7 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
 Compose a final user-facing response from the upstream agent outputs.
 Keep it concise, calm, supportive, and clearly non-clinical.
 Prefer the specialist draft when present.
-Use coping recommendations and follow-up suggestions selectively instead of repeating everything.
+Use coping recommendations, trend summaries, and follow-up suggestions selectively instead of repeating everything.
 Adapt the tone to the user's support-style preferences when available.
 """,
     )
@@ -120,6 +137,10 @@ Adapt the tone to the user's support-style preferences when available.
         f"Specialist agent:\n{state.get('specialist_agent', 'reflective_support')}\n\n"
         f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
         f"Primary draft:\n{state.get('specialist_response', state.get('reflective_response', ''))}\n\n"
+        f"Progress summary:\n{state.get('progress_summary', '')}\n\n"
+        f"Support progress summary:\n{state.get('support_progress_summary', '')}\n\n"
+        f"Recurring patterns:\n{state.get('recurring_patterns', [])}\n\n"
+        f"Intervention effectiveness:\n{state.get('intervention_effectiveness', {})}\n\n"
         f"Coping recommendations:\n{state.get('coping_recommendations', [])}\n\n"
         f"Journaling insights:\n{state.get('journaling_insights', [])}\n\n"
         f"Follow-up suggestions:\n{state.get('follow_up_suggestions', [])}\n\n"

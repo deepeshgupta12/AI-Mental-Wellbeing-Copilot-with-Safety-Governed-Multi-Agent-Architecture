@@ -42,6 +42,7 @@ from mental_wellbeing_api.agents.support_mode_router_agent import (
 from mental_wellbeing_api.agents.tone_emotion_analyzer_agent import (
     run_tone_emotion_analyzer_agent,
 )
+from mental_wellbeing_api.agents.trend_analyzer_agent import run_trend_analyzer_agent
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 
 
@@ -91,6 +92,7 @@ def build_agent_runtime_graph():
     graph.add_node("journaling_insight", run_journaling_insight_agent)
     graph.add_node("habit_care_plan", run_habit_care_plan_agent)
 
+    graph.add_node("trend_analyzer", run_trend_analyzer_agent)
     graph.add_node("preference_learning", run_preference_learning_agent)
     graph.add_node("response_composer", run_response_composer_agent)
     graph.add_node("policy_guardrail", run_policy_guardrail_agent)
@@ -127,15 +129,16 @@ def build_agent_runtime_graph():
         },
     )
 
-    graph.add_edge("reflective_support", "preference_learning")
-    graph.add_edge("distress_stabilization", "preference_learning")
-    graph.add_edge("behavioral_activation", "preference_learning")
-    graph.add_edge("cbt_reframing", "preference_learning")
-    graph.add_edge("sleep_recovery", "preference_learning")
-    graph.add_edge("social_support", "preference_learning")
-    graph.add_edge("journaling_insight", "preference_learning")
-    graph.add_edge("habit_care_plan", "preference_learning")
+    graph.add_edge("reflective_support", "trend_analyzer")
+    graph.add_edge("distress_stabilization", "trend_analyzer")
+    graph.add_edge("behavioral_activation", "trend_analyzer")
+    graph.add_edge("cbt_reframing", "trend_analyzer")
+    graph.add_edge("sleep_recovery", "trend_analyzer")
+    graph.add_edge("social_support", "trend_analyzer")
+    graph.add_edge("journaling_insight", "trend_analyzer")
+    graph.add_edge("habit_care_plan", "trend_analyzer")
 
+    graph.add_edge("trend_analyzer", "preference_learning")
     graph.add_edge("preference_learning", "response_composer")
     graph.add_edge("response_composer", "policy_guardrail")
     graph.add_edge("policy_guardrail", "execution_finalize")

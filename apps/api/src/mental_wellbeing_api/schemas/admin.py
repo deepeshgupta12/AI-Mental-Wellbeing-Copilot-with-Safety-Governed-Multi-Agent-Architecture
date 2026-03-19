@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AdminFlaggedSessionResponse(BaseModel):
@@ -42,3 +43,12 @@ class AdminAuditItemResponse(BaseModel):
 class AdminPolicyConfigResponse(BaseModel):
     runtime_policy: dict
     prompt_registry: dict
+
+
+class AdminTrendOverviewResponse(BaseModel):
+    total_users_with_snapshots: int
+    recent_snapshot_count: int
+    weekly_reflection_snapshot_count: int
+    top_recurring_patterns: list[str] = Field(default_factory=list)
+    intervention_effectiveness_summary: dict[str, Any] = Field(default_factory=dict)
+    recent_support_progress_summaries: list[str] = Field(default_factory=list)

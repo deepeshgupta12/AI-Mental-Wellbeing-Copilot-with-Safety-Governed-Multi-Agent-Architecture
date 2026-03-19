@@ -43,6 +43,13 @@ class AgentRuntimeState(TypedDict, total=False):
     journaling_insights: list[str]
     follow_up_suggestions: list[str]
 
+    progress_summary: str
+    support_progress_summary: str
+    trend_summary: str
+    recurring_patterns: list[str]
+    intervention_effectiveness: dict[str, Any]
+    trend_visualization: dict[str, Any]
+
     risk_level: str
     safety_flag_type: str
     safety_summary: str

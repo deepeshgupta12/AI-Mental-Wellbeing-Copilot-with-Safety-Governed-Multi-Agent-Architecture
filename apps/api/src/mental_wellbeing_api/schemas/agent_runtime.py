@@ -67,6 +67,12 @@ class AgentRuntimeSmokeResponse(BaseModel):
     coping_recommendations: list[str] = Field(default_factory=list)
     journaling_insights: list[str] = Field(default_factory=list)
     follow_up_suggestions: list[str] = Field(default_factory=list)
+    progress_summary: str | None = None
+    support_progress_summary: str | None = None
+    trend_summary: str | None = None
+    recurring_patterns: list[str] = Field(default_factory=list)
+    intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
+    trend_visualization: dict[str, Any] = Field(default_factory=dict)
     memory_hits: list[RecalledMemoryItemResponse] = Field(default_factory=list)
 
     execution_path: list[str] = Field(default_factory=list)
