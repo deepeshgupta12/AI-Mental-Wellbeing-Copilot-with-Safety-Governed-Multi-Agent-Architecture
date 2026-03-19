@@ -20,6 +20,8 @@ def test_safety_evaluation_endpoint_low_risk() -> None:
         payload = response.json()
         assert payload["risk_level"] == "low"
         assert payload["safety_override"] is False
+        assert payload["requires_human_review"] is False
+        assert payload["escalation_recommended"] is False
 
 
 def test_safety_evaluation_endpoint_high_risk() -> None:
@@ -36,6 +38,9 @@ def test_safety_evaluation_endpoint_high_risk() -> None:
         assert payload["risk_level"] == "high"
         assert payload["safety_override"] is True
         assert payload["safety_flag_type"] == "self_harm"
+        assert payload["requires_human_review"] is True
+        assert payload["escalation_recommended"] is True
+        assert payload["queue_status"] == "queued"
 
 
 def test_agent_runtime_high_risk_creates_safety_flag() -> None:
@@ -69,6 +74,12 @@ def test_agent_runtime_high_risk_creates_safety_flag() -> None:
         assert runtime_payload["risk_level"] == "high"
         assert runtime_payload["safety_override"] is True
         assert runtime_payload["safety_flag_type"] == "self_harm"
+        assert runtime_payload["requires_human_review"] is True
+        assert runtime_payload["review_recommended"] is True
+        assert runtime_payload["decision_path_label"] == "crisis_escalation"
+        assert runtime_payload["human_summary"] is not None
+        assert runtime_payload["evidence_bundle"]
+        assert runtime_payload["audit_snapshot"]
 
         flags_response = client.get(f"/api/v1/safety-flags?user_id={user_id}")
         assert flags_response.status_code == 200
@@ -76,3 +87,8 @@ def test_agent_runtime_high_risk_creates_safety_flag() -> None:
         assert len(flags_payload) == 1
         assert flags_payload[0]["flag_type"] == "self_harm"
         assert flags_payload[0]["severity"] == "high"
+
+        safety_events_response = client.get("/api/v1/admin/safety-events")
+        assert safety_events_response.status_code == 200
+        safety_events_payload = safety_events_response.json()
+        assert any(item["user_id"] == user_id for item in safety_events_payload)

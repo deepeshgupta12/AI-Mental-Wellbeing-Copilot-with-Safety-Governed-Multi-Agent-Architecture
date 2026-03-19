@@ -43,6 +43,12 @@ def test_agent_runtime_smoke() -> None:
     assert "follow_up_event_ids" in payload
     assert "temporal_contract" in payload
     assert "scheduler_backend" in payload
+    assert "requires_human_review" in payload
+    assert "decision_path_label" in payload
+    assert "human_summary" in payload
+    assert "evidence_bundle" in payload
+    assert "quality_checks" in payload
+    assert "audit_snapshot" in payload
 
 
 def test_agent_runtime_returns_memory_hits_preferences_and_generated_follow_up_for_known_user() -> None:
@@ -136,7 +142,16 @@ def test_agent_runtime_returns_memory_hits_preferences_and_generated_follow_up_f
             "placeholder",
         }
 
-        assert payload["support_track"] in {None, "stress_overwhelm", "sleep_recovery", "journaling_reflection", "social_support", "habit_support"}
+        assert payload["support_track"] in {
+            None,
+            "stress_overwhelm",
+            "sleep_recovery",
+            "journaling_reflection",
+            "social_support",
+            "habit_support",
+        }
         assert "follow_up_contract" in payload
         assert "temporal_contract" in payload
         assert "scheduler_backend" in payload
+        assert payload["requires_human_review"] is False
+        assert payload["decision_path_label"] in {"standard_support", "crisis_escalation"}

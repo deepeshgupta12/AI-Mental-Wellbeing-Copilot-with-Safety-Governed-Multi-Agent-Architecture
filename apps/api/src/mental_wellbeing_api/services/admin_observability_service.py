@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from collections import Counter
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -205,7 +204,9 @@ class AdminObservabilityService:
                 )
             ).all()
         )
-        follow_up_status_breakdown = dict(Counter(item.status for item in follow_up_rows if item.status))
+        follow_up_status_breakdown = dict(
+            Counter(item.status for item in follow_up_rows if item.status)
+        )
 
         intervention_overview = await self.get_intervention_overview()
 
