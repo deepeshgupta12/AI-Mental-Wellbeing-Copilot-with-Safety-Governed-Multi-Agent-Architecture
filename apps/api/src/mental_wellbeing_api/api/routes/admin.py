@@ -194,14 +194,7 @@ async def get_follow_up_overview(
 ) -> AdminFollowUpOverviewResponse:
     now = datetime.now(timezone.utc)
 
-    total_follow_up_plans = int(
-        (
-            await session.execute(
-                select(func.count(FollowUpPlan.id))
-            )
-        ).scalar()
-        or 0
-    )
+    total_follow_up_plans = int(((await session.execute(select(func.count(FollowUpPlan.id)))).scalar() or 0))
 
     active_scheduled_plans = int(
         (
@@ -248,9 +241,7 @@ async def get_follow_up_overview(
     failed_follow_up_events = int(
         (
             await session.execute(
-                select(func.count(FollowUpEvent.id)).where(
-                    FollowUpEvent.event_type == "failed"
-                )
+                select(func.count(FollowUpEvent.id)).where(FollowUpEvent.event_type == "failed")
             )
         ).scalar()
         or 0
@@ -284,9 +275,7 @@ async def get_follow_up_overview(
         contract = row.scheduling_contract_json
         if isinstance(contract, dict):
             backend = str(contract.get("scheduler_backend") or "unknown")
-            scheduler_backend_breakdown[backend] = (
-                scheduler_backend_breakdown.get(backend, 0) + 1
-            )
+            scheduler_backend_breakdown[backend] = scheduler_backend_breakdown.get(backend, 0) + 1
 
     upcoming_rows = list(
         (

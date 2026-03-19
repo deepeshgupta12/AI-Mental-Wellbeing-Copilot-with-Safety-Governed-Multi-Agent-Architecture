@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone, UTC
+from datetime import UTC, datetime, timedelta
 from typing import Any
+
+from mental_wellbeing_api.core.config import get_settings
 
 
 class FollowUpContractService:
@@ -22,6 +24,7 @@ class FollowUpContractService:
         specialist_agent: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        settings = get_settings()
         scheduled_for = datetime.now(UTC) + timedelta(hours=self.DEFAULT_DELAY_HOURS)
 
         cadence_json = {
@@ -31,7 +34,7 @@ class FollowUpContractService:
 
         scheduling_contract_json = {
             "contract_version": "v2-followup-basic",
-            "scheduler_backend": "placeholder",
+            "scheduler_backend": settings.scheduler_backend,
             "workflow_family": "follow_up_reminder",
             "future_ready": True,
             "status": "planned_not_enqueued",

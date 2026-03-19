@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from mental_wellbeing_api.main import app
 
 
-def test_runtime_creates_and_lists_follow_up_plan() -> None:
+def test_runtime_creates_lists_completes_and_cancels_follow_up_plan() -> None:
     unique_email = f"followup-{uuid4()}@example.com"
 
     with TestClient(app) as client:
@@ -46,10 +46,20 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
         assert generated_plan["scheduling_contract_json"]["contract_version"] == "v2-followup-basic"
         assert generated_plan["scheduling_contract_json"]["status"] == "planned_not_enqueued"
 
+        assert runtime_payload["follow_up_required"] is True
+        assert runtime_payload["follow_up_plan_id"] == generated_plan["id"]
+        assert runtime_payload["follow_up_contract"]["contract_version"] == "v2-followup-basic"
+        assert runtime_payload["temporal_contract"]["contract_version"] == "v2-temporal-ready"
+        assert runtime_payload["scheduler_backend"] == "local_contract"
+        assert len(runtime_payload["follow_up_event_ids"]) >= 1
+
+        get_response = client.get(f"/api/v1/follow-ups/plans/{generated_plan['id']}")
+        assert get_response.status_code == 200
+        assert get_response.json()["id"] == generated_plan["id"]
+
         list_response = client.get(f"/api/v1/follow-ups/plans?user_id={user_id}")
         assert list_response.status_code == 200
         list_payload = list_response.json()
-
         assert len(list_payload) >= 1
         assert list_payload[0]["id"] == generated_plan["id"]
 
@@ -66,10 +76,40 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
         )
         assert event_response.status_code == 200
         event_payload = event_response.json()
-
         assert event_payload["follow_up_plan_id"] == generated_plan["id"]
         assert event_payload["event_type"] == "delivered"
         assert event_payload["outcome_status"] == "sent"
+
+        complete_response = client.post(
+            f"/api/v1/follow-ups/plans/{generated_plan['id']}/complete",
+            json={
+                "notes": "User completed the follow up.",
+                "outcome_status": "completed",
+            },
+        )
+        assert complete_response.status_code == 200
+        assert complete_response.json()["status"] == "completed"
+
+        patch_response = client.patch(
+            f"/api/v1/follow-ups/plans/{generated_plan['id']}",
+            json={
+                "status": "scheduled",
+                "notes": "Rescheduled for another run.",
+                "outcome_status": "scheduled",
+            },
+        )
+        assert patch_response.status_code == 200
+        assert patch_response.json()["status"] == "scheduled"
+
+        cancel_response = client.post(
+            f"/api/v1/follow-ups/plans/{generated_plan['id']}/cancel",
+            json={
+                "notes": "User cancelled the reminder.",
+                "outcome_status": "cancelled",
+            },
+        )
+        assert cancel_response.status_code == 200
+        assert cancel_response.json()["status"] == "cancelled"
 
         events_response = client.get(
             f"/api/v1/follow-ups/events?follow_up_plan_id={generated_plan['id']}"
@@ -79,6 +119,9 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
 
         assert len(events_payload) >= 1
         assert events_payload[0]["follow_up_plan_id"] == generated_plan["id"]
+        assert any(item["event_type"] == "scheduled" for item in events_payload)
+        assert any(item["event_type"] == "completed" for item in events_payload)
+        assert any(item["event_type"] == "cancelled" for item in events_payload)
 
         admin_overview_response = client.get("/api/v1/admin/follow-up-overview")
         assert admin_overview_response.status_code == 200
@@ -95,19 +138,17 @@ def test_runtime_creates_and_lists_follow_up_plan() -> None:
         assert "upcoming_due_follow_ups" in admin_overview_payload
         assert "recent_completion_outcomes" in admin_overview_payload
         assert admin_overview_payload["total_follow_up_plans"] >= 1
-        assert admin_overview_payload["active_scheduled_plans"] >= 1
         assert "in_app" in admin_overview_payload["delivery_channel_breakdown"]
+        assert "local_contract" in admin_overview_payload["scheduler_backend_breakdown"]
 
         admin_plans_response = client.get("/api/v1/admin/follow-up-plans")
         assert admin_plans_response.status_code == 200
         admin_plans_payload = admin_plans_response.json()
-
         assert len(admin_plans_payload) >= 1
         assert any(item["id"] == generated_plan["id"] for item in admin_plans_payload)
 
         admin_events_response = client.get("/api/v1/admin/follow-up-events")
         assert admin_events_response.status_code == 200
         admin_events_payload = admin_events_response.json()
-
         assert len(admin_events_payload) >= 1
         assert any(item["follow_up_plan_id"] == generated_plan["id"] for item in admin_events_payload)
