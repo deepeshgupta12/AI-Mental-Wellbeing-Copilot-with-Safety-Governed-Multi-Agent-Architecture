@@ -87,3 +87,37 @@ admin:
   intervention_logs_enabled: true
   config_registry_enabled: true
   analytics_overview_enabled: true
+
+models:
+  agent_assignments:
+    input_structuring:
+      provider: openai
+      model: gpt-4o-mini
+    reflective_support:
+      provider: ollama
+      model: llama3.2
+    behavioral_activation:
+      provider: ollama
+      model: llama3.2
+    cbt_reframing:
+      provider: openai
+      model: gpt-4o-mini
+    sleep_recovery:
+      provider: ollama
+      model: llama3.2
+    social_support:
+      provider: openai
+      model: gpt-4o-mini
+    journaling_insight:
+      provider: openai
+      model: gpt-4o-mini
+    habit_care_plan:
+      provider: openai
+      model: gpt-4o-mini
+    response_composer:
+      provider: openai
+      model: gpt-4o-mini
+
+classifiers:
+  local_prescreen_enabled: true
+  local_prescreen_mode: advisory_only

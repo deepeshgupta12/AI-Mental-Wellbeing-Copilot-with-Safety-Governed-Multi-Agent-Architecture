@@ -200,7 +200,12 @@ If a follow-up plan exists, briefly mention the continuity step, reminder timing
         f"Scheduler backend:\n{state.get('scheduler_backend', '')}\n\n"
         "Compose the final response."
     )
-    final_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    final_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="response_composer",
+    )
 
     state = {
         **state,

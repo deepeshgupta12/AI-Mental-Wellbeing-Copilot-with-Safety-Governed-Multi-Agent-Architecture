@@ -41,7 +41,12 @@ Stay supportive and concise.
         "Write a brief response that validates the feeling, identifies one possible distorted pattern, "
         "and offers one more balanced alternative thought."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="cbt_reframing",
+    )
 
     state = {
         **state,

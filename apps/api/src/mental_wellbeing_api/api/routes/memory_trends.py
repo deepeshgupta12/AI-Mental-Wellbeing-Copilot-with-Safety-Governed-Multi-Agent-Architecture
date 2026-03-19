@@ -322,4 +322,5 @@ async def get_trend_summary(
         recurring_patterns=trend_bundle.get("recurring_patterns", []),
         intervention_effectiveness=trend_bundle.get("intervention_effectiveness", {}),
         trend_visualization=trend_bundle.get("trend_visualization", {}),
+        trend_series=trend_bundle.get("trend_series", {}),
     )

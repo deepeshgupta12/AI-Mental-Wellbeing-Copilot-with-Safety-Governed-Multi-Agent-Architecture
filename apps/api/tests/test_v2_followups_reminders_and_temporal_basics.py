@@ -48,6 +48,9 @@ def test_runtime_creates_lists_completes_and_cancels_follow_up_plan() -> None:
 
         assert runtime_payload["follow_up_required"] is True
         assert runtime_payload["follow_up_plan_id"] == generated_plan["id"]
+        assert runtime_payload["follow_up_contract"]
+        assert runtime_payload["temporal_contract"]
+        assert runtime_payload["scheduler_backend"] is not None
         assert runtime_payload["follow_up_contract"]["contract_version"] == "v2-followup-basic"
         assert runtime_payload["follow_up_contract"]["status"] == "planned_not_enqueued"
         assert runtime_payload["scheduler_backend"] in {
@@ -55,6 +58,7 @@ def test_runtime_creates_lists_completes_and_cancels_follow_up_plan() -> None:
             "local_contract",
             "placeholder",
         }
+
         assert runtime_payload["temporal_contract"]["workflow_name"] is not None
         assert runtime_payload["temporal_contract"]["task_queue"] is not None
         assert runtime_payload["temporal_contract"]["idempotency_key"] is not None

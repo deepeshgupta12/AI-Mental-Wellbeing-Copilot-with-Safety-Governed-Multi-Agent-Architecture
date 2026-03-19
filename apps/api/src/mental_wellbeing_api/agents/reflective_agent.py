@@ -25,7 +25,12 @@ Validate gently, avoid diagnosis, and keep the tone grounded.
         f"Structured summary:\n{state['structured_input']}\n\n"
         "Write a brief reflective response."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="reflective_support",
+    )
 
     state = {
         **state,

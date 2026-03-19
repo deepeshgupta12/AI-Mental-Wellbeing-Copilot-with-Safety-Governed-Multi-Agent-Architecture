@@ -5,14 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
-from mental_wellbeing_api.services.follow_up_contract_service import FollowUpContractService
 from mental_wellbeing_api.services.scheduler_service import SchedulerService
 
 
 class FollowUpService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
-        self.contracts = FollowUpContractService()
         self.scheduler = SchedulerService(session)
 
     async def create_plan(

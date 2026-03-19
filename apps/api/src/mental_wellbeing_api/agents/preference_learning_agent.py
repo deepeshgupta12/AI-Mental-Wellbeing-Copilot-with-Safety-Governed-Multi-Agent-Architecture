@@ -32,13 +32,23 @@ def run_preference_learning_agent(state: AgentRuntimeState) -> AgentRuntimeState
     specialist_agent = (state.get("specialist_agent") or "").lower()
     current_preferences = dict(state.get("preference_signals", {}))
 
-    inferred_support_style = current_preferences.get("support_style")
-    inferred_preferred_support_mode = current_preferences.get("preferred_support_mode")
+    current_support_style = (current_preferences.get("support_style") or "").lower() or None
+    current_preferred_support_mode = (
+        (current_preferences.get("preferred_support_mode") or "").lower() or None
+    )
+
+    inferred_support_style = current_support_style
+    inferred_preferred_support_mode = current_preferred_support_mode
 
     style_candidates = {support_mode, support_strategy, specialist_agent}
 
+    # Preserve an explicitly direct user preference unless the route is also direct,
+    # and never downgrade direct users into reflective/calm just because a single
+    # session used a reflective specialist.
     if style_candidates & DIRECT_STYLE_HINTS:
         inferred_support_style = "direct"
+    elif current_support_style:
+        inferred_support_style = current_support_style
     elif style_candidates & REFLECTIVE_STYLE_HINTS:
         inferred_support_style = "reflective"
     elif style_candidates & RECOVERY_STYLE_HINTS:
@@ -57,18 +67,22 @@ def run_preference_learning_agent(state: AgentRuntimeState) -> AgentRuntimeState
     if inferred_preferred_support_mode:
         updated_preferences["preferred_support_mode"] = inferred_preferred_support_mode
 
+    learned_preferences: dict[str, str] = {}
+    if inferred_support_style:
+        learned_preferences["support_style"] = inferred_support_style
+    if inferred_preferred_support_mode:
+        learned_preferences["preferred_support_mode"] = inferred_preferred_support_mode
+
     state = {
         **state,
         "preference_signals": updated_preferences,
-        "learned_preferences": {
-            "support_style": inferred_support_style,
-            "preferred_support_mode": inferred_preferred_support_mode,
-        },
+        "learned_preferences": learned_preferences,
     }
     state = append_execution_event(
         state,
         node_name="preference_learning",
         metadata={
+            "previous_support_style": current_support_style,
             "support_style": inferred_support_style,
             "preferred_support_mode": inferred_preferred_support_mode,
         },
@@ -76,7 +90,7 @@ def run_preference_learning_agent(state: AgentRuntimeState) -> AgentRuntimeState
     state = append_handoff(
         state,
         from_agent="preference_learning",
-        to_agent="response_composer",
-        reason="preference adaptation signals prepared for composition",
+        to_agent="follow_up_planner",
+        reason="preference adaptation signals prepared for follow-up planning and composition",
     )
     return state

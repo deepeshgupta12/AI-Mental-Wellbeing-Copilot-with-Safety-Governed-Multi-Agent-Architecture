@@ -135,3 +135,8 @@ def test_agent_runtime_returns_memory_hits_preferences_and_generated_follow_up_f
             "local_contract",
             "placeholder",
         }
+
+        assert payload["support_track"] in {None, "stress_overwhelm", "sleep_recovery", "journaling_reflection", "social_support", "habit_support"}
+        assert "follow_up_contract" in payload
+        assert "temporal_contract" in payload
+        assert "scheduler_backend" in payload

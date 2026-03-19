@@ -38,7 +38,12 @@ Keep it concise and grounded.
         f"Session context:\n{state.get('session_context', '')}\n\n"
         "Write a brief response that highlights one or two themes and one reflective next question."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="journaling_insight",
+    )
 
     state = {
         **state,

@@ -38,7 +38,12 @@ Focus on realistic consistency, not intensity. Keep the plan very small and spec
         f"Preferred support style:\n{state.get('preference_signals', {}).get('support_style', '')}\n\n"
         "Write a brief response with one tiny habit plan, one trigger, and one easy fallback option."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="habit_care_plan",
+    )
 
     state = {
         **state,

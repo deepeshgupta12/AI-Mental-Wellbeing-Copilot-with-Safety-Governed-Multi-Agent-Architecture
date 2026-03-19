@@ -35,12 +35,15 @@ class Settings(BaseSettings):
     ollama_default_model: str = Field(default="llama3.2", alias="OLLAMA_DEFAULT_MODEL")
 
     scheduler_backend: str = Field(default="local_contract", alias="SCHEDULER_BACKEND")
+
     temporal_enabled: bool = Field(default=False, alias="TEMPORAL_ENABLED")
+    temporal_host: str = Field(default="localhost:7233", alias="TEMPORAL_HOST")
     temporal_namespace: str = Field(default="default", alias="TEMPORAL_NAMESPACE")
     temporal_task_queue: str = Field(
         default="mental-wellbeing-followups",
         alias="TEMPORAL_TASK_QUEUE",
     )
+    temporal_enable_worker: bool = Field(default=False, alias="TEMPORAL_ENABLE_WORKER")
 
     cors_allow_origins: str = Field(
         default=(

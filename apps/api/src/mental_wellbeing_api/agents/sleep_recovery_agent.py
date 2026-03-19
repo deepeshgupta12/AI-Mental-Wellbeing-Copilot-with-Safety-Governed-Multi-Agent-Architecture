@@ -39,7 +39,12 @@ Keep it concise and realistic.
         f"What helped before:\n{state.get('what_helped_before', [])}\n\n"
         "Write a brief response focused on sleep recovery and one or two practical wind-down suggestions."
     )
-    specialist_response = llm.generate_text(state["provider"], system_prompt, user_prompt)
+    specialist_response = llm.generate_text(
+        state["provider"],
+        system_prompt,
+        user_prompt,
+        agent_name="sleep_recovery",
+    )
 
     state = {
         **state,

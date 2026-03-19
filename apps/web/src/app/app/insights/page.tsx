@@ -125,6 +125,51 @@ export default function InsightsPage() {
               </div>
             </div>
 
+            <div className="mb-6 rounded-lg border border-border bg-card p-6 shadow-card">
+              <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
+                Trend visualization
+              </h2>
+
+              <div className="mb-6">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Mood trend</p>
+                <div className="flex items-end gap-2">
+                  {(trend?.trend_series?.mood_series ?? []).map((point, index) => {
+                    const value = point.mood_score ?? 0;
+                    return (
+                      <div key={`${point.timestamp}-${index}`} className="flex-1">
+                        <div
+                          className="w-full rounded-t bg-primary/70"
+                          style={{ height: `${Math.max(value, 1) * 10}px` }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted-foreground">
+                  Recurring trigger frequency
+                </p>
+                <div className="space-y-2">
+                  {(trend?.trend_series?.trigger_frequency ?? []).map((item) => (
+                    <div key={item.trigger}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="text-foreground">{item.trigger}</span>
+                        <span className="text-muted-foreground">{item.frequency}</span>
+                      </div>
+                      <div className="h-2 rounded bg-muted">
+                        <div
+                          className="h-2 rounded bg-primary"
+                          style={{ width: `${Math.min(item.frequency * 18, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-lg border border-border bg-card p-6 shadow-card">
               <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
                 Current continuity signals

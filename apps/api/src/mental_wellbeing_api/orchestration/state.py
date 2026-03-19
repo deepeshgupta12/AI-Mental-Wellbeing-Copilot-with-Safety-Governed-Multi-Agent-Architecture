@@ -7,6 +7,7 @@ class AgentRuntimeState(TypedDict, total=False):
     user_id: str
     user_input: str
     provider: str
+    support_track: str | None
 
     trace_id: str
     current_node: str
@@ -16,10 +17,15 @@ class AgentRuntimeState(TypedDict, total=False):
 
     recalled_memories: list[str]
     recalled_memory_items: list[dict[str, Any]]
+    episodic_memory_hits: list[dict[str, Any]]
+    semantic_memory_hits: list[dict[str, Any]]
+
     preference_signals: dict[str, str]
     learned_preferences: dict[str, str]
     what_helped_before: list[str]
     session_context: str
+
+    local_classifier_signals: dict[str, Any]
 
     tone_label: str
     emotion_label: str

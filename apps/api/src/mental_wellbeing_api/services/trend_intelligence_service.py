@@ -20,6 +20,7 @@ class TrendIntelligenceService:
         self.session = session
 
     async def build_runtime_trend_bundle(self, *, user_id: str) -> dict[str, Any]:
+        trend_series = await self.build_trend_series(user_id=user_id)
         latest_snapshot = await self.session.scalar(
             select(TrendSnapshot)
             .where(TrendSnapshot.user_id == user_id)
@@ -143,6 +144,7 @@ class TrendIntelligenceService:
             "recurring_patterns": recurring_patterns,
             "intervention_effectiveness": intervention_effectiveness,
             "trend_visualization": trend_visualization,
+            "trend_series": trend_series,
             "latest_snapshot_window_type": latest_snapshot.window_type if latest_snapshot else None,
             "latest_snapshot_created_at": latest_snapshot.created_at if latest_snapshot else None,
         }
@@ -290,3 +292,51 @@ class TrendIntelligenceService:
         if value is None:
             return None
         return round(float(value), 2)
+    
+    async def build_trend_series(self, *, user_id: str) -> dict[str, Any]:
+        recent_check_ins = list(
+            (
+                await self.session.scalars(
+                    select(CheckIn)
+                    .where(CheckIn.user_id == user_id)
+                    .order_by(CheckIn.created_at.asc())
+                    .limit(12)
+                )
+            ).all()
+        )
+
+        mood_series = [
+            {
+                "timestamp": item.created_at.isoformat(),
+                "mood_score": item.mood_score,
+                "stress_score": item.stress_score,
+                "energy_score": item.energy_score,
+                "sleep_hours": item.sleep_hours,
+            }
+            for item in recent_check_ins
+        ]
+
+        recurring_trigger_rows = list(
+            (
+                await self.session.scalars(
+                    select(TriggerCluster)
+                    .where(TriggerCluster.user_id == user_id)
+                    .order_by(desc(TriggerCluster.frequency), desc(TriggerCluster.updated_at))
+                    .limit(8)
+                )
+            ).all()
+        )
+
+        trigger_frequency = [
+            {
+                "trigger": item.cluster_name,
+                "frequency": item.frequency,
+            }
+            for item in recurring_trigger_rows
+            if item.cluster_name
+        ]
+
+        return {
+            "mood_series": mood_series,
+            "trigger_frequency": trigger_frequency,
+        }

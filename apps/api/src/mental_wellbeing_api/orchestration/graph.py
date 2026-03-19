@@ -9,6 +9,7 @@ from mental_wellbeing_api.agents.cbt_reframing_agent import run_cbt_reframing_ag
 from mental_wellbeing_api.agents.distress_stabilization_agent import (
     run_distress_stabilization_agent,
 )
+from mental_wellbeing_api.agents.episodic_memory_agent import run_episodic_memory_agent
 from mental_wellbeing_api.agents.execution_finalize_agent import (
     run_execution_finalize_agent,
 )
@@ -34,6 +35,9 @@ from mental_wellbeing_api.agents.response_composer_agent import (
     run_response_composer_agent,
 )
 from mental_wellbeing_api.agents.safety_triage_agent import run_safety_triage_agent
+from mental_wellbeing_api.agents.semantic_memory_retriever_agent import (
+    run_semantic_memory_retriever_agent,
+)
 from mental_wellbeing_api.agents.session_context_builder_agent import (
     run_session_context_builder_agent,
 )
@@ -52,7 +56,7 @@ from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 def _route_after_safety(state: AgentRuntimeState) -> str:
     if state.get("safety_override"):
         return "response_composer"
-    return "session_context_builder"
+    return "episodic_memory"
 
 
 def _route_after_support_mode(state: AgentRuntimeState) -> str:
@@ -80,6 +84,8 @@ def build_agent_runtime_graph():
     graph = StateGraph(AgentRuntimeState)
 
     graph.add_node("safety_triage", run_safety_triage_agent)
+    graph.add_node("episodic_memory", run_episodic_memory_agent)
+    graph.add_node("semantic_memory_retriever", run_semantic_memory_retriever_agent)
     graph.add_node("session_context_builder", run_session_context_builder_agent)
     graph.add_node("input_structuring", run_input_structuring_agent)
     graph.add_node("tone_emotion_analyzer", run_tone_emotion_analyzer_agent)
@@ -108,11 +114,13 @@ def build_agent_runtime_graph():
         "safety_triage",
         _route_after_safety,
         {
-            "session_context_builder": "session_context_builder",
+            "episodic_memory": "episodic_memory",
             "response_composer": "response_composer",
         },
     )
 
+    graph.add_edge("episodic_memory", "semantic_memory_retriever")
+    graph.add_edge("semantic_memory_retriever", "session_context_builder")
     graph.add_edge("session_context_builder", "input_structuring")
     graph.add_edge("input_structuring", "tone_emotion_analyzer")
     graph.add_edge("tone_emotion_analyzer", "intent_router")

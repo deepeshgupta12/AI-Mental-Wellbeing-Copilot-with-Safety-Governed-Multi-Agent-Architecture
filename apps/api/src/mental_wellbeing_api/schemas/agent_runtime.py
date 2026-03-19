@@ -77,6 +77,8 @@ class AgentRuntimeSmokeResponse(BaseModel):
     intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
     trend_visualization: dict[str, Any] = Field(default_factory=dict)
 
+    support_track: str | None = None
+
     follow_up_required: bool = False
     follow_up_plan: dict[str, Any] = Field(default_factory=dict)
     follow_up_contract: dict[str, Any] = Field(default_factory=dict)
