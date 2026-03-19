@@ -49,3 +49,4 @@ class TrendSummaryResponse(BaseModel):
     recurring_patterns: list[str] = Field(default_factory=list)
     intervention_effectiveness: dict[str, Any] = Field(default_factory=dict)
     trend_visualization: dict[str, Any] = Field(default_factory=dict)
+    trend_series: dict[str, Any] = Field(default_factory=dict)
