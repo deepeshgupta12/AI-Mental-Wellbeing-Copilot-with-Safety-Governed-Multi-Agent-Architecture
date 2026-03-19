@@ -74,17 +74,8 @@ scheduling:
   future_ready_temporal: true
   enqueue_mode: contract_only
   workflow_name_default: follow_up_reminder_workflow
-  task_queue_default: follow-up-reminders
+  task_queue_default: mental-wellbeing-followups
   idempotency_key_prefix: followup
-  reminder_delivery_defaults:
-    in_app:
-      enabled: true
-    email:
-      enabled: false
-    whatsapp:
-      enabled: false
-    internal:
-      enabled: true
 
 admin:
   flagged_sessions_enabled: true
@@ -92,3 +83,7 @@ admin:
   audit_view_enabled: true
   policy_view_enabled: true
   follow_up_overview_enabled: true
+  trace_viewer_enabled: true
+  intervention_logs_enabled: true
+  config_registry_enabled: true
+  analytics_overview_enabled: true

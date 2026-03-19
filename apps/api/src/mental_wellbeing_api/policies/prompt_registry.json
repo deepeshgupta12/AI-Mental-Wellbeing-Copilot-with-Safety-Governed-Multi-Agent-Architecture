@@ -1,4 +1,5 @@
 {
+  "version": "v2-10.0.0",
   "prompt_map": {
     "agents/input_structuring.txt": "agents/input_structuring.txt",
     "agents/reflective_support.txt": "agents/reflective_support.txt",
