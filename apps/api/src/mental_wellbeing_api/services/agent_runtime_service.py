@@ -25,6 +25,7 @@ from mental_wellbeing_api.services.safety_service import (
     SafetyEvaluationResponse,
     SafetyService,
 )
+from mental_wellbeing_api.services.temporal_contract_service import TemporalContractService
 from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 
@@ -38,6 +39,7 @@ class AgentRuntimeService:
         self.trend_service = TrendIntelligenceService(session)
         self.follow_up_service = FollowUpService(session)
         self.safety_review_service = SafetyReviewService(session)
+        self.temporal_contract_service = TemporalContractService()
 
     async def evaluate_safety_only(
         self,
@@ -85,6 +87,48 @@ class AgentRuntimeService:
         self.session.add(trace)
         await self.session.commit()
 
+    def _build_follow_up_plan_preview(self, result: dict) -> dict:
+        return {
+            "plan_type": result.get("follow_up_plan_type"),
+            "title": result.get("follow_up_plan_title"),
+            "description": result.get("follow_up_plan_description"),
+            "scheduled_for": result.get("follow_up_due_at"),
+            "delivery_channel": result.get("follow_up_delivery_channel"),
+            "status": result.get("follow_up_status"),
+        }
+
+    def _build_alertable_safety_trace(self, result: dict) -> bool:
+        if bool(result.get("safety_override", False)):
+            return True
+        if bool(result.get("requires_human_review", False)):
+            return True
+        if bool(result.get("escalation_recommended", False)):
+            return True
+        return str(result.get("risk_level") or "").lower() == "high"
+
+    def _build_safety_temporal_contract(
+        self,
+        *,
+        user_id: str | None,
+        trace_id: str,
+        result: dict,
+    ) -> dict:
+        if not user_id:
+            return {}
+
+        if not self._build_alertable_safety_trace(result):
+            return {}
+
+        return self.temporal_contract_service.build_safety_contract(
+            user_id=user_id,
+            trace_id=trace_id,
+            risk_level=str(result.get("risk_level") or "low"),
+            review_priority=result.get("review_priority"),
+            decision_path_label=result.get("decision_path_label"),
+            queue_status=result.get("queue_status"),
+            safety_flag_type=result.get("safety_flag_type"),
+        )
+
     async def _log_execution_trace(
         self,
         *,
@@ -94,6 +138,9 @@ class AgentRuntimeService:
     ) -> None:
         node_trace = result.get("node_trace", [])
         handoff_history = result.get("handoff_history", [])
+
+        alertable_safety_trace = bool(result.get("alertable_safety_trace", False))
+        safety_temporal_contract = result.get("safety_temporal_contract", {})
 
         for event in node_trace:
             node_name = event.get("node_name", "unknown")
@@ -123,28 +170,32 @@ class AgentRuntimeService:
                     "support_track": result.get("support_track"),
                     "risk_level": result.get("risk_level"),
                     "requires_human_review": result.get("requires_human_review"),
+                    "escalation_recommended": result.get("escalation_recommended"),
+                    "review_priority": result.get("review_priority"),
+                    "queue_status": result.get("queue_status"),
+                    "decision_path_label": result.get("decision_path_label"),
+                    "alertable_safety_trace": alertable_safety_trace,
+                    "safety_temporal_contract": safety_temporal_contract,
                 },
                 output_payload_json={
                     "status": event.get("status"),
                     "metadata": event.get("metadata", {}),
+                    "human_summary": result.get("human_summary"),
+                    "evidence_bundle": result.get("evidence_bundle", {}),
+                    "quality_checks": result.get("quality_checks", {}),
+                    "audit_snapshot": result.get("audit_snapshot", {}),
                 },
                 status=event.get("status", "completed"),
                 latency_ms=None,
-                notes="V2 graph execution trace",
+                notes=(
+                    "V3 alertable safety trace"
+                    if alertable_safety_trace
+                    else "V2 graph execution trace"
+                ),
             )
             self.session.add(trace)
 
         await self.session.commit()
-
-    def _build_follow_up_plan_preview(self, result: dict) -> dict:
-        return {
-            "plan_type": result.get("follow_up_plan_type"),
-            "title": result.get("follow_up_plan_title"),
-            "description": result.get("follow_up_plan_description"),
-            "scheduled_for": result.get("follow_up_due_at"),
-            "delivery_channel": result.get("follow_up_delivery_channel"),
-            "status": result.get("follow_up_status"),
-        }
 
     async def _create_safety_runtime_artifacts(
         self,
@@ -191,11 +242,16 @@ class AgentRuntimeService:
                     "flag_type": safety_eval.safety_flag_type,
                     "decision_path_label": result.get("decision_path_label"),
                     "human_summary": result.get("human_summary"),
+                    "evidence_bundle": result.get("evidence_bundle", {}),
+                    "audit_snapshot": result.get("audit_snapshot", {}),
+                    "alertable_safety_trace": result.get("alertable_safety_trace", False),
                 },
                 event_payload_json={
                     "trace_id": result.get("trace_id"),
                     "routing_contract": result.get("routing_contract", {}),
                     "execution_summary": result.get("execution_summary"),
+                    "review_priority": result.get("review_priority"),
+                    "safety_temporal_contract": result.get("safety_temporal_contract", {}),
                 },
                 requires_human_review=bool(safety_eval.requires_human_review),
                 escalation_channel="human_reviewer" if safety_eval.requires_human_review else None,
@@ -309,7 +365,16 @@ class AgentRuntimeService:
                 "quality_checks": {},
                 "audit_snapshot": {},
                 "review_recommended": False,
+                "alertable_safety_trace": False,
+                "safety_temporal_contract": {},
             }
+        )
+
+        result["alertable_safety_trace"] = self._build_alertable_safety_trace(result)
+        result["safety_temporal_contract"] = self._build_safety_temporal_contract(
+            user_id=str(payload.user_id) if payload.user_id else None,
+            trace_id=trace_id,
+            result=result,
         )
 
         if payload.user_id is not None:
@@ -425,6 +490,8 @@ class AgentRuntimeService:
             quality_checks=result.get("quality_checks", {}),
             audit_snapshot=result.get("audit_snapshot", {}),
             review_recommended=bool(result.get("review_recommended", False)),
+            alertable_safety_trace=bool(result.get("alertable_safety_trace", False)),
+            safety_temporal_contract=result.get("safety_temporal_contract", {}),
             follow_up_required=bool(result.get("follow_up_required", False)),
             follow_up_plan=self._build_follow_up_plan_preview(result),
             follow_up_contract=result.get("follow_up_contract", {}),

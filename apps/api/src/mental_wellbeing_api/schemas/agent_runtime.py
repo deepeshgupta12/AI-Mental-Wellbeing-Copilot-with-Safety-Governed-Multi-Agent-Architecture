@@ -90,6 +90,8 @@ class AgentRuntimeSmokeResponse(BaseModel):
     quality_checks: dict[str, Any] = Field(default_factory=dict)
     audit_snapshot: dict[str, Any] = Field(default_factory=dict)
     review_recommended: bool = False
+    alertable_safety_trace: bool = False
+    safety_temporal_contract: dict[str, Any] = Field(default_factory=dict)
 
     follow_up_required: bool = False
     follow_up_plan: dict[str, Any] = Field(default_factory=dict)

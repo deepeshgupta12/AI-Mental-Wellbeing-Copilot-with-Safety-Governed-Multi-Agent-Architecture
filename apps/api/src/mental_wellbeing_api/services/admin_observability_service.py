@@ -8,10 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.admin_config_version import AdminConfigVersion
 from mental_wellbeing_api.models.agent_trace import AgentTrace
+from mental_wellbeing_api.models.audit_log import AuditLog
 from mental_wellbeing_api.models.conversation import ConversationSession
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.models.intervention_log import InterventionLog
+from mental_wellbeing_api.models.safety_event import SafetyEvent
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
 
 
@@ -135,6 +137,132 @@ class AdminObservabilityService:
             "related_sessions": sessions,
         }
 
+    async def get_safety_flow_overview(self) -> dict[str, Any]:
+        total_safety_events = int((await self.session.scalar(select(func.count(SafetyEvent.id)))) or 0)
+        queued_safety_events = int(
+            (
+                await self.session.scalar(
+                    select(func.count(SafetyEvent.id)).where(SafetyEvent.queue_status == "queued")
+                )
+            )
+            or 0
+        )
+        in_review_safety_events = int(
+            (
+                await self.session.scalar(
+                    select(func.count(SafetyEvent.id)).where(SafetyEvent.queue_status == "in_review")
+                )
+            )
+            or 0
+        )
+        resolved_safety_events = int(
+            (
+                await self.session.scalar(
+                    select(func.count(SafetyEvent.id)).where(SafetyEvent.queue_status == "resolved")
+                )
+            )
+            or 0
+        )
+        high_risk_safety_events = int(
+            (
+                await self.session.scalar(
+                    select(func.count(SafetyEvent.id)).where(SafetyEvent.risk_level == "high")
+                )
+            )
+            or 0
+        )
+        critical_safety_events = int(
+            (
+                await self.session.scalar(
+                    select(func.count(SafetyEvent.id)).where(SafetyEvent.severity == "critical")
+                )
+            )
+            or 0
+        )
+        immutable_audit_log_count = int(
+            (
+                await self.session.scalar(
+                    select(func.count(AuditLog.id)).where(AuditLog.is_immutable.is_(True))
+                )
+            )
+            or 0
+        )
+
+        traces = await self.list_agent_traces(limit=500)
+        grouped_trace_snapshots: dict[str, dict[str, Any]] = {}
+
+        for trace in traces:
+            payload = trace.input_payload_json or {}
+            trace_key = trace.trace_name
+            bucket = grouped_trace_snapshots.setdefault(
+                trace_key,
+                {
+                    "alertable_safety_trace": False,
+                    "decision_path_label": payload.get("decision_path_label"),
+                    "review_priority": payload.get("review_priority"),
+                    "safety_temporal_contract": payload.get("safety_temporal_contract", {}),
+                },
+            )
+
+            if bool(payload.get("alertable_safety_trace")):
+                bucket["alertable_safety_trace"] = True
+            if payload.get("decision_path_label"):
+                bucket["decision_path_label"] = payload.get("decision_path_label")
+            if payload.get("review_priority"):
+                bucket["review_priority"] = payload.get("review_priority")
+            if payload.get("safety_temporal_contract"):
+                bucket["safety_temporal_contract"] = payload.get("safety_temporal_contract", {})
+
+        alertable_trace_count = 0
+        decision_path_counter = Counter()
+        review_priority_counter = Counter()
+        temporal_safety_contract_status_breakdown = Counter()
+
+        for snapshot in grouped_trace_snapshots.values():
+            if not snapshot["alertable_safety_trace"]:
+                continue
+
+            alertable_trace_count += 1
+            decision_path_counter[str(snapshot.get("decision_path_label") or "unknown")] += 1
+            review_priority_counter[str(snapshot.get("review_priority") or "normal")] += 1
+
+            contract = snapshot.get("safety_temporal_contract")
+            if isinstance(contract, dict) and contract:
+                temporal_safety_contract_status_breakdown[
+                    str(contract.get("status") or "unknown")
+                ] += 1
+            else:
+                temporal_safety_contract_status_breakdown["missing"] += 1
+
+        escalation_rows = (
+            await self.session.execute(
+                select(SafetyEvent.escalation_status, func.count(SafetyEvent.id).label("count"))
+                .group_by(SafetyEvent.escalation_status)
+                .order_by(desc("count"))
+            )
+        ).all()
+
+        return {
+            "total_safety_events": total_safety_events,
+            "queued_safety_events": queued_safety_events,
+            "in_review_safety_events": in_review_safety_events,
+            "resolved_safety_events": resolved_safety_events,
+            "high_risk_safety_events": high_risk_safety_events,
+            "critical_safety_events": critical_safety_events,
+            "alertable_trace_count": alertable_trace_count,
+            "immutable_audit_log_count": immutable_audit_log_count,
+            "decision_path_breakdown": dict(decision_path_counter),
+            "review_priority_breakdown": dict(review_priority_counter),
+            "escalation_status_breakdown": {
+                str(row.escalation_status): int(row.count or 0)
+                for row in escalation_rows
+                if row.escalation_status
+            },
+            "temporal_safety_contract_status_breakdown": dict(
+                temporal_safety_contract_status_breakdown
+            ),
+        }
+
     async def get_ops_overview(self) -> dict[str, Any]:
         total_flags = int((await self.session.scalar(select(func.count(SafetyFlag.id)))) or 0)
         unresolved_flags = int(
@@ -168,6 +296,7 @@ class AdminObservabilityService:
 
         latest_traces = await self.list_grouped_runtime_executions(limit=10)
         intervention_overview = await self.get_intervention_overview()
+        safety_flow_overview = await self.get_safety_flow_overview()
 
         return {
             "total_flags": total_flags,
@@ -179,6 +308,7 @@ class AdminObservabilityService:
             "active_config_versions": active_config_versions,
             "latest_runtime_executions": latest_traces,
             "intervention_overview": intervention_overview,
+            "safety_flow_overview": safety_flow_overview,
         }
 
     async def get_analytics_overview(self) -> dict[str, Any]:
@@ -209,6 +339,7 @@ class AdminObservabilityService:
         )
 
         intervention_overview = await self.get_intervention_overview()
+        safety_flow_overview = await self.get_safety_flow_overview()
 
         return {
             "runtime_status_breakdown": dict(status_counter),
@@ -216,4 +347,5 @@ class AdminObservabilityService:
             "support_strategy_breakdown": dict(strategy_counter),
             "follow_up_status_breakdown": follow_up_status_breakdown,
             "intervention_overview": intervention_overview,
+            "safety_flow_overview": safety_flow_overview,
         }
