@@ -13,14 +13,50 @@ import {
 } from "@/lib/admin-api";
 import { getApiErrorMessage } from "@/lib/api-client";
 
+function defaultOrganizationOverridePayload() {
+  return {
+    governance: {
+      escalation_policy_overrides: {},
+      model_provider_policy_overrides: {},
+      feature_flags: {},
+    },
+  };
+}
+
+function safeStringify(value: unknown) {
+  return JSON.stringify(value, null, 2);
+}
+
+function parseEditorObject(value: string, label: string): Record<string, unknown> {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    throw new Error(`${label} JSON cannot be empty.`);
+  }
+
+  const parsed = JSON.parse(trimmed) as unknown;
+
+  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error(`${label} JSON must be an object.`);
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
 export default function EnterpriseSettingsPage() {
   const queryClient = useQueryClient();
 
   const [organizationId, setOrganizationId] = useState("");
   const [deploymentEditor, setDeploymentEditor] = useState("{}");
-  const [organizationEditor, setOrganizationEditor] = useState("{}");
+  const [organizationEditor, setOrganizationEditor] = useState(
+    safeStringify(defaultOrganizationOverridePayload()),
+  );
   const [deploymentChangeNote, setDeploymentChangeNote] = useState("");
   const [organizationChangeNote, setOrganizationChangeNote] = useState("");
+  const [deploymentValidationError, setDeploymentValidationError] = useState<string | null>(null);
+  const [organizationValidationError, setOrganizationValidationError] = useState<string | null>(
+    null,
+  );
 
   const deploymentSettingsQuery = useQuery({
     queryKey: ["admin-deployment-settings"],
@@ -31,6 +67,7 @@ export default function EnterpriseSettingsPage() {
     queryKey: ["admin-organization-settings", organizationId],
     queryFn: () => getAdminOrganizationSettings(organizationId),
     enabled: organizationId.trim().length > 0,
+    retry: false,
   });
 
   const resolvedSettingsQuery = useQuery({
@@ -41,34 +78,43 @@ export default function EnterpriseSettingsPage() {
   useEffect(() => {
     if (deploymentSettingsQuery.data) {
       setDeploymentEditor(JSON.stringify(deploymentSettingsQuery.data.payload_json, null, 2));
+      setDeploymentValidationError(null);
     }
   }, [deploymentSettingsQuery.data]);
 
   useEffect(() => {
     if (organizationSettingsQuery.data) {
-      setOrganizationEditor(JSON.stringify(organizationSettingsQuery.data.payload_json, null, 2));
-    } else if (!organizationId.trim()) {
-      setOrganizationEditor("{}");
+      const nextPayload =
+        organizationSettingsQuery.data.payload_json ?? defaultOrganizationOverridePayload();
+      setOrganizationEditor(JSON.stringify(nextPayload, null, 2));
+      setOrganizationValidationError(null);
+      return;
+    }
+
+    if (!organizationId.trim()) {
+      setOrganizationEditor(JSON.stringify(defaultOrganizationOverridePayload(), null, 2));
+      setOrganizationValidationError(null);
     }
   }, [organizationSettingsQuery.data, organizationId]);
 
   const deploymentMutation = useMutation({
     mutationFn: async () => {
-      const parsed = JSON.parse(deploymentEditor) as Record<string, unknown>;
+      const parsed = parseEditorObject(deploymentEditor, "Deployment settings");
       return updateAdminDeploymentSettings(parsed, deploymentChangeNote || null);
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-deployment-settings"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-resolved-enterprise-settings"] });
       setDeploymentChangeNote("");
+      setDeploymentValidationError(null);
     },
   });
 
   const organizationMutation = useMutation({
     mutationFn: async () => {
-      const parsed = JSON.parse(organizationEditor) as Record<string, unknown>;
+      const parsed = parseEditorObject(organizationEditor, "Organization override settings");
       return updateAdminOrganizationSettings(
-        organizationId,
+        organizationId.trim(),
         parsed,
         organizationChangeNote || null,
       );
@@ -79,6 +125,7 @@ export default function EnterpriseSettingsPage() {
       });
       await queryClient.invalidateQueries({ queryKey: ["admin-resolved-enterprise-settings"] });
       setOrganizationChangeNote("");
+      setOrganizationValidationError(null);
     },
   });
 
@@ -112,7 +159,10 @@ export default function EnterpriseSettingsPage() {
 
             <textarea
               value={deploymentEditor}
-              onChange={(e) => setDeploymentEditor(e.target.value)}
+              onChange={(e) => {
+                setDeploymentEditor(e.target.value);
+                setDeploymentValidationError(null);
+              }}
               className="min-h-[420px] w-full rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground"
             />
 
@@ -125,12 +175,26 @@ export default function EnterpriseSettingsPage() {
               />
               <button
                 type="button"
-                onClick={() => deploymentMutation.mutate()}
+                onClick={() => {
+                  try {
+                    parseEditorObject(deploymentEditor, "Deployment settings");
+                    setDeploymentValidationError(null);
+                    deploymentMutation.mutate();
+                  } catch (error) {
+                    setDeploymentValidationError(
+                      error instanceof Error ? error.message : "Invalid deployment settings JSON.",
+                    );
+                  }
+                }}
                 className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background"
               >
                 {deploymentMutation.isPending ? "Saving..." : "Save Deployment Settings"}
               </button>
             </div>
+
+            {deploymentValidationError ? (
+              <div className="mt-3 text-sm text-destructive">{deploymentValidationError}</div>
+            ) : null}
 
             {deploymentMutation.isError ? (
               <div className="mt-3 text-sm text-destructive">
@@ -151,14 +215,20 @@ export default function EnterpriseSettingsPage() {
 
             <input
               value={organizationId}
-              onChange={(e) => setOrganizationId(e.target.value)}
+              onChange={(e) => {
+                setOrganizationId(e.target.value);
+                setOrganizationValidationError(null);
+              }}
               placeholder="Organization ID"
               className="mb-3 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
             />
 
             <textarea
               value={organizationEditor}
-              onChange={(e) => setOrganizationEditor(e.target.value)}
+              onChange={(e) => {
+                setOrganizationEditor(e.target.value);
+                setOrganizationValidationError(null);
+              }}
               className="min-h-[420px] w-full rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground"
             />
 
@@ -171,13 +241,43 @@ export default function EnterpriseSettingsPage() {
               />
               <button
                 type="button"
-                onClick={() => organizationMutation.mutate()}
+                onClick={() => {
+                  if (!organizationId.trim()) {
+                    setOrganizationValidationError("Organization ID is required.");
+                    return;
+                  }
+
+                  try {
+                    parseEditorObject(
+                      organizationEditor,
+                      "Organization override settings",
+                    );
+                    setOrganizationValidationError(null);
+                    organizationMutation.mutate();
+                  } catch (error) {
+                    setOrganizationValidationError(
+                      error instanceof Error
+                        ? error.message
+                        : "Invalid organization override JSON.",
+                    );
+                  }
+                }}
                 disabled={!organizationId.trim()}
                 className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
               >
                 {organizationMutation.isPending ? "Saving..." : "Save Organization Overrides"}
               </button>
             </div>
+
+            {organizationSettingsQuery.isError ? (
+              <div className="mt-3 text-sm text-destructive">
+                {getApiErrorMessage(organizationSettingsQuery.error)}
+              </div>
+            ) : null}
+
+            {organizationValidationError ? (
+              <div className="mt-3 text-sm text-destructive">{organizationValidationError}</div>
+            ) : null}
 
             {organizationMutation.isError ? (
               <div className="mt-3 text-sm text-destructive">
