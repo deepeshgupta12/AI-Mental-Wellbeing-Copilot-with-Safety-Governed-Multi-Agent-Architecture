@@ -73,3 +73,14 @@ class AgentRuntimeState(TypedDict, total=False):
     safety_flag_type: str
     safety_summary: str
     safety_override: bool
+
+    requires_human_review: bool
+    escalation_recommended: bool
+    review_priority: str | None
+    queue_status: str | None
+    decision_path_label: str | None
+    human_summary: str | None
+    evidence_bundle: dict[str, Any]
+    quality_checks: dict[str, Any]
+    audit_snapshot: dict[str, Any]
+    review_recommended: bool

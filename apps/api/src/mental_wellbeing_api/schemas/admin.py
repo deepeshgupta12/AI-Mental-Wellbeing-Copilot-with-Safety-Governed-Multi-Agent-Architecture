@@ -235,3 +235,109 @@ class AdminAnalyticsOverviewResponse(BaseModel):
     support_strategy_breakdown: dict[str, int] = Field(default_factory=dict)
     follow_up_status_breakdown: dict[str, int] = Field(default_factory=dict)
     intervention_overview: AdminInterventionOverviewResponse
+
+
+class AdminSafetyEventResponse(BaseModel):
+    id: str
+    user_id: str
+    session_id: str | None
+    safety_flag_id: str | None
+    event_type: str
+    severity: str
+    risk_level: str
+    queue_status: str
+    requires_human_review: bool
+    escalation_channel: str | None
+    escalation_status: str
+    title: str
+    summary: str | None
+    evidence_json: dict | None = None
+    event_payload_json: dict | None = None
+    detected_at: datetime
+    assigned_at: datetime | None
+    resolved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminSafetyReviewResponse(BaseModel):
+    id: str
+    safety_event_id: str
+    safety_flag_id: str | None
+    user_id: str
+    session_id: str | None
+    reviewer_id: str | None
+    review_status: str
+    resolution_type: str | None
+    reviewer_note: str | None
+    human_summary: str | None
+    decision_rationale: str | None
+    review_payload_json: dict | None = None
+    escalation_required: bool
+    escalation_status: str | None
+    reviewed_at: datetime | None
+    resolved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminSafetyEventDetailResponse(BaseModel):
+    event: AdminSafetyEventResponse
+    reviews: list[AdminSafetyReviewResponse] = Field(default_factory=list)
+
+
+class AdminSafetyReviewCreateRequest(BaseModel):
+    reviewer_id: str | None = None
+    review_status: str
+    reviewer_note: str | None = None
+    human_summary: str | None = None
+    decision_rationale: str | None = None
+    resolution_type: str | None = None
+    escalation_required: bool = False
+    escalation_status: str | None = None
+    review_payload_json: dict[str, Any] | None = None
+
+
+class AdminReviewerDashboardResponse(BaseModel):
+    total_events: int
+    queued_events: int
+    in_review_events: int
+    resolved_events: int
+    severity_breakdown: dict[str, int] = Field(default_factory=dict)
+    escalation_status_breakdown: dict[str, int] = Field(default_factory=dict)
+    recent_reviews: list[AdminSafetyReviewResponse] = Field(default_factory=list)
+
+
+class AdminEscalationAnalyticsResponse(BaseModel):
+    total_events: int
+    escalated_events: int
+    high_risk_events: int
+    critical_events: int
+    event_type_breakdown: dict[str, int] = Field(default_factory=dict)
+
+
+class AdminAuditLogResponse(BaseModel):
+    id: str
+    event_type: str
+    entity_type: str
+    entity_id: str
+    user_id: str | None
+    session_id: str | None
+    safety_event_id: str | None
+    safety_review_id: str | None
+    actor_type: str
+    actor_id: str | None
+    title: str
+    details: str | None
+    before_json: dict | None = None
+    after_json: dict | None = None
+    event_payload_json: dict | None = None
+    is_immutable: bool
+    occurred_at: datetime
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

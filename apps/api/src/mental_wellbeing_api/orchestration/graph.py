@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
+from mental_wellbeing_api.agents.audit_agent import run_audit_agent
 from mental_wellbeing_api.agents.behavioral_activation_agent import (
     run_behavioral_activation_agent,
 )
 from mental_wellbeing_api.agents.cbt_reframing_agent import run_cbt_reframing_agent
+from mental_wellbeing_api.agents.crisis_escalation_agent import run_crisis_escalation_agent
 from mental_wellbeing_api.agents.distress_stabilization_agent import (
     run_distress_stabilization_agent,
 )
 from mental_wellbeing_api.agents.episodic_memory_agent import run_episodic_memory_agent
+from mental_wellbeing_api.agents.evidence_quality_agent import run_evidence_quality_agent
 from mental_wellbeing_api.agents.execution_finalize_agent import (
     run_execution_finalize_agent,
 )
@@ -17,6 +20,9 @@ from mental_wellbeing_api.agents.follow_up_planner_agent import (
     run_follow_up_planner_agent,
 )
 from mental_wellbeing_api.agents.habit_care_plan_agent import run_habit_care_plan_agent
+from mental_wellbeing_api.agents.human_summary_generator_agent import (
+    run_human_summary_generator_agent,
+)
 from mental_wellbeing_api.agents.input_structuring_agent import (
     run_input_structuring_agent,
 )
@@ -55,7 +61,7 @@ from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 
 def _route_after_safety(state: AgentRuntimeState) -> str:
     if state.get("safety_override"):
-        return "response_composer"
+        return "crisis_escalation"
     return "episodic_memory"
 
 
@@ -84,6 +90,11 @@ def build_agent_runtime_graph():
     graph = StateGraph(AgentRuntimeState)
 
     graph.add_node("safety_triage", run_safety_triage_agent)
+    graph.add_node("crisis_escalation", run_crisis_escalation_agent)
+    graph.add_node("evidence_quality", run_evidence_quality_agent)
+    graph.add_node("human_summary_generator", run_human_summary_generator_agent)
+    graph.add_node("audit_agent", run_audit_agent)
+
     graph.add_node("episodic_memory", run_episodic_memory_agent)
     graph.add_node("semantic_memory_retriever", run_semantic_memory_retriever_agent)
     graph.add_node("session_context_builder", run_session_context_builder_agent)
@@ -115,9 +126,14 @@ def build_agent_runtime_graph():
         _route_after_safety,
         {
             "episodic_memory": "episodic_memory",
-            "response_composer": "response_composer",
+            "crisis_escalation": "crisis_escalation",
         },
     )
+
+    graph.add_edge("crisis_escalation", "evidence_quality")
+    graph.add_edge("evidence_quality", "human_summary_generator")
+    graph.add_edge("human_summary_generator", "audit_agent")
+    graph.add_edge("audit_agent", "response_composer")
 
     graph.add_edge("episodic_memory", "semantic_memory_retriever")
     graph.add_edge("semantic_memory_retriever", "session_context_builder")
@@ -152,7 +168,10 @@ def build_agent_runtime_graph():
 
     graph.add_edge("trend_analyzer", "preference_learning")
     graph.add_edge("preference_learning", "follow_up_planner")
-    graph.add_edge("follow_up_planner", "response_composer")
+    graph.add_edge("follow_up_planner", "evidence_quality")
+    graph.add_edge("evidence_quality", "human_summary_generator")
+    graph.add_edge("human_summary_generator", "audit_agent")
+    graph.add_edge("audit_agent", "response_composer")
     graph.add_edge("response_composer", "policy_guardrail")
     graph.add_edge("policy_guardrail", "execution_finalize")
     graph.add_edge("execution_finalize", END)

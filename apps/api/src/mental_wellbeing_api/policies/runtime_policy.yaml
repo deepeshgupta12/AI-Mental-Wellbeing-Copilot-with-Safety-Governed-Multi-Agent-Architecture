@@ -89,6 +89,12 @@ admin:
   analytics_overview_enabled: true
 
 models:
+  risk_tier_gating:
+    high_risk_provider: openai
+    high_risk_model: gpt-4o-mini
+    final_response_provider: openai
+    final_response_model: gpt-4o-mini
+
   agent_assignments:
     input_structuring:
       provider: openai
@@ -112,6 +118,9 @@ models:
       provider: openai
       model: gpt-4o-mini
     habit_care_plan:
+      provider: openai
+      model: gpt-4o-mini
+    crisis_escalation:
       provider: openai
       model: gpt-4o-mini
     response_composer:

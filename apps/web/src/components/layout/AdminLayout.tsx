@@ -11,15 +11,21 @@ import {
   GitCompare,
   LayoutDashboard,
   Route,
-  ScrollText,
   Settings2,
+  ShieldAlert,
+  SplitSquareVertical,
+  History,
 } from "lucide-react";
 
 const adminNav = [
   { title: "Overview", url: "/admin", icon: LayoutDashboard },
+  { title: "Safety Queue", url: "/admin/safety-events", icon: ShieldAlert },
+  { title: "Reviewer Dashboard", url: "/admin/reviewer-dashboard", icon: Activity },
+  { title: "Decision Path Explorer", url: "/admin/decision-paths", icon: SplitSquareVertical },
+  { title: "Escalation Analytics", url: "/admin/escalations", icon: BarChart3 },
   { title: "Trace Viewer", url: "/admin/cases", icon: FileSearch },
   { title: "Flagged Sessions", url: "/admin/flagged", icon: Flag },
-  { title: "Interventions", url: "/admin/safety-events", icon: Activity },
+  { title: "Policy History", url: "/admin/policy-history", icon: History },
   { title: "Config Audit", url: "/admin/audit", icon: GitCompare },
   { title: "Routing / Policy", url: "/admin/policy", icon: Route },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
@@ -33,7 +39,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh w-full bg-background">
-      <aside className="hidden min-h-screen w-64 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
+      <aside className="hidden min-h-screen w-72 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
         <div className="border-b border-border p-5">
           <Link href="/admin" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-foreground">
@@ -83,9 +89,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
           <h2 className="font-heading font-semibold text-foreground">
-            Admin Intelligence & Observability
+            Admin Intelligence & Safety Operations
           </h2>
-          <div className="text-xs text-muted-foreground">V2-10</div>
+          <div className="text-xs text-muted-foreground">V3-Pack6</div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

@@ -8,6 +8,10 @@ class SafetyEvaluationResponse(BaseModel):
     safety_flag_type: str | None = None
     safety_summary: str | None = None
     safety_override: bool
+    requires_human_review: bool = False
+    escalation_recommended: bool = False
+    queue_status: str | None = None
+    review_priority: str | None = None
 
 
 class SafetyService:
@@ -32,6 +36,10 @@ class SafetyService:
                     safety_flag_type=flag_type,
                     safety_summary=f"High-risk language detected: {flag_type}",
                     safety_override=True,
+                    requires_human_review=True,
+                    escalation_recommended=True,
+                    queue_status="queued",
+                    review_priority="urgent",
                 )
 
         for flag_type, patterns in self.MEDIUM_RISK_PATTERNS:
@@ -41,6 +49,10 @@ class SafetyService:
                     safety_flag_type=flag_type,
                     safety_summary=f"Elevated-risk language detected: {flag_type}",
                     safety_override=False,
+                    requires_human_review=True,
+                    escalation_recommended=False,
+                    queue_status="queued",
+                    review_priority="high",
                 )
 
         return SafetyEvaluationResponse(
@@ -48,4 +60,8 @@ class SafetyService:
             safety_flag_type=None,
             safety_summary=None,
             safety_override=False,
+            requires_human_review=False,
+            escalation_recommended=False,
+            queue_status=None,
+            review_priority="normal",
         )

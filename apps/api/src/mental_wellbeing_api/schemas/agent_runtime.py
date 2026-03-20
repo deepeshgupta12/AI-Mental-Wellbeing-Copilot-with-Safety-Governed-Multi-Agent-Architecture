@@ -12,6 +12,7 @@ class AgentRuntimeSmokeRequest(BaseModel):
     user_input: str = Field(min_length=1, max_length=4000)
     provider: Literal["openai", "ollama", "mock"] = "mock"
     user_id: UUID | None = None
+    support_track: str | None = None
 
 
 class RecalledMemoryItemResponse(BaseModel):
@@ -78,6 +79,17 @@ class AgentRuntimeSmokeResponse(BaseModel):
     trend_visualization: dict[str, Any] = Field(default_factory=dict)
 
     support_track: str | None = None
+
+    requires_human_review: bool = False
+    escalation_recommended: bool = False
+    review_priority: str | None = None
+    queue_status: str | None = None
+    decision_path_label: str | None = None
+    human_summary: str | None = None
+    evidence_bundle: dict[str, Any] = Field(default_factory=dict)
+    quality_checks: dict[str, Any] = Field(default_factory=dict)
+    audit_snapshot: dict[str, Any] = Field(default_factory=dict)
+    review_recommended: bool = False
 
     follow_up_required: bool = False
     follow_up_plan: dict[str, Any] = Field(default_factory=dict)
