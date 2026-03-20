@@ -22,6 +22,18 @@ def _sanitize_text(value: str | None) -> str:
     return text
 
 
+def _normalize_visible_response(text: str) -> str:
+    cleaned = _sanitize_text(text)
+    cleaned = re.sub(
+        r"(Support summary:|Progress:|Patterns:|Intervention trend:|Follow-up:|Reminder timing:|Delivery channel:|Scheduler backend:|Follow-up plan:)",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
 def _safe_specialist_text(state: AgentRuntimeState) -> str:
     specialist_response = _sanitize_text(
         state.get("specialist_response") or state.get("reflective_response", "")
@@ -37,7 +49,7 @@ def _safe_specialist_text(state: AgentRuntimeState) -> str:
         "recover": "Let's keep this gentle and focus on one realistic recovery step.",
         "connect": "You do not have to carry this alone. We can think about one safe connection point.",
         "journal": "There may be a pattern here worth naming before trying to solve everything at once.",
-        "plan": "Let's make this smaller and more concrete so it is easier to follow through.",
+        "plan": "Let's make this concrete. We can turn this into a small plan that feels realistic today.",
         "stabilize": "For now, let's focus on getting a little steadier, one moment at a time.",
     }
     return fallback_by_mode.get(
@@ -46,30 +58,62 @@ def _safe_specialist_text(state: AgentRuntimeState) -> str:
     )
 
 
-def _normalize_visible_response(text: str) -> str:
-    cleaned = _sanitize_text(text)
-    cleaned = re.sub(
-        r"(Support summary:|Progress:|Patterns:|Intervention trend:|Follow-up:|Reminder timing:|Delivery channel:|Scheduler backend:|Follow-up plan:)",
-        "",
-        cleaned,
-        flags=re.IGNORECASE,
-    )
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned
-
-
 def _build_mock_final_response(state: AgentRuntimeState) -> str:
-    specialist_response = _safe_specialist_text(state)
+    support_mode = (state.get("support_mode") or "").lower()
+    support_style = (state.get("preference_signals") or {}).get("support_style", "").lower()
     coping_recommendations = state.get("coping_recommendations", [])
     follow_up_suggestions = state.get("follow_up_suggestions", [])
 
-    parts: list[str] = []
+    mode_openers = {
+        "reflect": "It sounds like this has been weighing on you.",
+        "activate": "Let's keep this practical and clear.",
+        "reframe": "Let's slow this down and look at it more clearly.",
+        "recover": "Let's keep this gentle and manageable for right now.",
+        "connect": "You do not have to carry this alone.",
+        "journal": "There may be something important here worth naming more clearly.",
+        "plan": "Let's make this concrete.",
+        "stabilize": "Let's focus on the next safe and steady step.",
+    }
 
-    if specialist_response:
-        parts.append(specialist_response)
+    opener = mode_openers.get(
+        support_mode,
+        "I'm here with you, and we can take this one step at a time.",
+    )
+
+    specialist_text = _safe_specialist_text(state)
+
+    parts: list[str] = [opener]
+
+    if support_mode == "plan":
+        if support_style == "direct":
+            parts.append(
+                "We can make this smaller and more repeatable so it feels easier to follow through."
+            )
+        else:
+            parts.append(
+                "We can turn this into a small plan that feels realistic and not overwhelming."
+            )
+    elif support_mode == "activate":
+        parts.append(
+            "Choose one tiny next step today so this feels slightly more manageable."
+        )
+    elif support_mode == "recover":
+        parts.append(
+            "For now, focus on one calming action rather than solving everything at once."
+        )
+    elif support_mode == "reframe":
+        parts.append(
+            "A hard moment does not automatically define the whole picture."
+        )
+    elif support_mode == "reflect":
+        parts.append(
+            "It makes sense that you want to understand this more clearly."
+        )
 
     if coping_recommendations:
         parts.append(coping_recommendations[0])
+    elif specialist_text and specialist_text not in parts:
+        parts.append(specialist_text)
 
     if follow_up_suggestions:
         parts.append(follow_up_suggestions[0])
