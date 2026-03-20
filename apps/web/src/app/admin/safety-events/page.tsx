@@ -78,6 +78,12 @@ export default function SafetyEventsPage() {
     [events],
   );
 
+  const selectedDecisionPath =
+    (selectedEvent?.evidence_json?.decision_path_label as string | undefined) ?? "—";
+
+  const selectedHumanSummary =
+    (selectedEvent?.evidence_json?.human_summary as string | undefined) ?? "No human summary available.";
+
   return (
     <div className="p-6 md:p-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -118,7 +124,7 @@ export default function SafetyEventsPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_1.2fr]">
           <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">
             <div className="border-b border-border px-4 py-3">
               <h2 className="font-heading text-sm font-semibold text-foreground">
@@ -129,18 +135,10 @@ export default function SafetyEventsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left">
-                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
-                      Event
-                    </th>
-                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
-                      Risk
-                    </th>
-                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
-                      Queue
-                    </th>
-                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">
-                      Detected
-                    </th>
+                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">Event</th>
+                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">Risk</th>
+                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">Queue</th>
+                    <th className="px-4 py-3 text-xs font-medium text-muted-foreground">Detected</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,19 +179,17 @@ export default function SafetyEventsPage() {
           <div className="space-y-6">
             <div className="rounded-lg border border-border bg-card p-4 shadow-card">
               <h2 className="mb-4 font-heading text-sm font-semibold text-foreground">
-                Event detail
+                Safety review detail
               </h2>
 
               {!selectedEvent ? (
                 <div className="text-sm text-muted-foreground">
-                  Select a safety event from the queue to inspect evidence and reviews.
+                  Select a safety event from the queue to inspect evidence, decision path, human summary, and reviews.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <div className="text-sm font-medium text-foreground">
-                      {selectedEvent.title}
-                    </div>
+                    <div className="text-sm font-medium text-foreground">{selectedEvent.title}</div>
                     <div className="mt-1 text-xs text-muted-foreground">
                       {selectedEvent.summary || "No summary available"}
                     </div>
@@ -210,9 +206,7 @@ export default function SafetyEventsPage() {
                     </div>
                     <div className="rounded-md border border-border bg-background p-3">
                       <div className="text-muted-foreground">Escalation</div>
-                      <div className="mt-1 text-foreground">
-                        {selectedEvent.escalation_status}
-                      </div>
+                      <div className="mt-1 text-foreground">{selectedEvent.escalation_status}</div>
                     </div>
                     <div className="rounded-md border border-border bg-background p-3">
                       <div className="text-muted-foreground">Human review</div>
@@ -222,10 +216,22 @@ export default function SafetyEventsPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <div className="mb-2 text-xs font-medium text-muted-foreground">
-                      Reviews
+                  <div className="rounded-md border border-border bg-background p-3">
+                    <div className="mb-1 text-[11px] uppercase text-muted-foreground">
+                      Decision path
                     </div>
+                    <div className="text-sm text-foreground">{selectedDecisionPath}</div>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-background p-3">
+                    <div className="mb-1 text-[11px] uppercase text-muted-foreground">
+                      Human summary
+                    </div>
+                    <div className="text-sm text-foreground">{selectedHumanSummary}</div>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">Reviews</div>
                     <div className="space-y-2">
                       {selectedReviews.length === 0 ? (
                         <div className="rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">
@@ -233,20 +239,36 @@ export default function SafetyEventsPage() {
                         </div>
                       ) : (
                         selectedReviews.map((review) => (
-                          <div
-                            key={review.id}
-                            className="rounded-md border border-border bg-background p-3"
-                          >
-                            <div className="text-sm font-medium text-foreground">
-                              {review.review_status}
+                          <div key={review.id} className="rounded-md border border-border bg-background p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm font-medium text-foreground">
+                                {review.review_status}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {review.reviewer_id || "unknown reviewer"}
+                              </div>
                             </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
+                            <div className="mt-2 text-xs text-muted-foreground">
                               {review.reviewer_note || review.human_summary || "No note"}
                             </div>
+                            {review.decision_rationale ? (
+                              <div className="mt-2 text-[11px] text-muted-foreground">
+                                Rationale: {review.decision_rationale}
+                              </div>
+                            ) : null}
                           </div>
                         ))
                       )}
                     </div>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 text-xs font-medium text-muted-foreground">
+                      Evidence payload
+                    </div>
+                    <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-background p-3 text-[11px] text-muted-foreground">
+                      {JSON.stringify(selectedEvent.evidence_json ?? {}, null, 2)}
+                    </pre>
                   </div>
 
                   <button
@@ -254,7 +276,7 @@ export default function SafetyEventsPage() {
                     disabled={reviewMutation.isPending}
                     className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-aether hover:opacity-90 disabled:opacity-60"
                   >
-                    Mark reviewed & escalated
+                    {reviewMutation.isPending ? "Updating..." : "Mark reviewed & escalated"}
                   </button>
                 </div>
               )}
@@ -268,12 +290,20 @@ export default function SafetyEventsPage() {
                 {auditItems.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No audit items available.</div>
                 ) : (
-                  auditItems.slice(0, 8).map((item) => (
+                  auditItems.slice(0, 10).map((item) => (
                     <div key={item.id} className="rounded-md border border-border bg-background p-3">
-                      <div className="text-sm text-foreground">{item.title}</div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm text-foreground">{item.title}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {item.is_immutable ? "immutable" : "mutable"}
+                        </div>
+                      </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {item.event_type} · {new Date(item.occurred_at).toLocaleString()}
                       </div>
+                      {item.details ? (
+                        <div className="mt-2 text-[11px] text-muted-foreground">{item.details}</div>
+                      ) : null}
                     </div>
                   ))
                 )}
