@@ -49,6 +49,43 @@ class LLMService:
         }
         return mock_map.get(agent_name or "", self._fallback_text(agent_name))
 
+    def _generate_openai_text(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> str:
+        if not self.settings.openai_api_key:
+            return ""
+
+        client = OpenAI(api_key=self.settings.openai_api_key)
+        response = client.responses.create(
+            model=model,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return (response.output_text or "").strip()
+
+    def _generate_ollama_text(
+        self,
+        *,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> str:
+        client = OllamaClient(host=self.settings.ollama_base_url)
+        response = client.chat(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return (response.get("message", {}).get("content") or "").strip()
+
     def generate_text(
         self,
         provider: str,
@@ -72,36 +109,53 @@ class LLMService:
             return self._mock_text(agent_name)
 
         if normalized_provider == "openai":
-            if not self.settings.openai_api_key:
-                return self._fallback_text(agent_name)
+            try:
+                text = self._generate_openai_text(
+                    model=assigned_model or self.settings.openai_model,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                if text:
+                    return text
+            except Exception:
+                pass
 
             try:
-                client = OpenAI(api_key=self.settings.openai_api_key)
-                response = client.responses.create(
-                    model=assigned_model or self.settings.openai_model,
-                    input=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
+                text = self._generate_ollama_text(
+                    model=self.settings.ollama_default_model,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
                 )
-                text = (response.output_text or "").strip()
-                return text or self._fallback_text(agent_name)
+                if text:
+                    return text
             except Exception:
-                return self._fallback_text(agent_name)
+                pass
+
+            return self._fallback_text(agent_name)
 
         if normalized_provider == "ollama":
             try:
-                client = OllamaClient(host=self.settings.ollama_base_url)
-                response = client.chat(
+                text = self._generate_ollama_text(
                     model=assigned_model or self.settings.ollama_default_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
                 )
-                text = (response.get("message", {}).get("content") or "").strip()
-                return text or self._fallback_text(agent_name)
+                if text:
+                    return text
             except Exception:
-                return self._fallback_text(agent_name)
+                pass
+
+            try:
+                text = self._generate_openai_text(
+                    model=self.settings.openai_model,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                )
+                if text:
+                    return text
+            except Exception:
+                pass
+
+            return self._fallback_text(agent_name)
 
         return self._fallback_text(agent_name)

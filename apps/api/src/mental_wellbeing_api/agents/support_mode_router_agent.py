@@ -14,6 +14,7 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
     user_input = state.get("user_input", "").lower()
     preference_signals = state.get("preference_signals", {})
     support_style = preference_signals.get("support_style", "").lower()
+    preferred_support_mode = preference_signals.get("preferred_support_mode", "").lower()
     intent_label = state.get("intent_label", "general_reflection")
     emotion_label = state.get("emotion_label", "reflective")
     emotion_intensity = state.get("emotion_intensity", "low")
@@ -29,8 +30,12 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
             routing_policy.get("behavioral_activation_hints", []),
         )
     )
-    direct_style_values = set(support_rules.get("direct_style_values", ["direct", "structured", "action-oriented"]))
-    reflective_style_values = set(support_rules.get("reflective_style_values", ["reflective", "soft", "calm", "minimal"]))
+    direct_style_values = set(
+        support_rules.get("direct_style_values", ["direct", "structured", "action-oriented"])
+    )
+    reflective_style_values = set(
+        support_rules.get("reflective_style_values", ["reflective", "soft", "calm", "minimal"])
+    )
     contract_name = str(routing_policy.get("contract_name", "v2-routing-core"))
 
     if risk_level == "medium":
@@ -38,6 +43,36 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
         support_strategy = str(routing_policy.get("medium_risk_strategy", "distress_stabilization"))
         specialist_agent = "distress_stabilization"
         routing_reason = "medium-risk state prefers stabilization"
+    elif preferred_support_mode == "recover":
+        support_mode = "recover"
+        support_strategy = "sleep_recovery"
+        specialist_agent = "sleep_recovery"
+        routing_reason = "ui mode preference matched recovery"
+    elif preferred_support_mode == "connect":
+        support_mode = "connect"
+        support_strategy = "social_support"
+        specialist_agent = "social_support"
+        routing_reason = "ui mode preference matched connection"
+    elif preferred_support_mode == "reframe":
+        support_mode = "reframe"
+        support_strategy = "cbt_reframing"
+        specialist_agent = "cbt_reframing"
+        routing_reason = "ui mode preference matched problem-solving"
+    elif preferred_support_mode == "plan":
+        support_mode = "plan"
+        support_strategy = "habit_care_plan"
+        specialist_agent = "habit_care_plan"
+        routing_reason = "ui mode preference matched planning"
+    elif preferred_support_mode == "activate":
+        support_mode = "activate"
+        support_strategy = "behavioral_activation"
+        specialist_agent = "behavioral_activation"
+        routing_reason = "ui mode preference matched activation"
+    elif preferred_support_mode == "reflect":
+        support_mode = "reflect"
+        support_strategy = "reflective"
+        specialist_agent = "reflective_support"
+        routing_reason = "ui mode preference matched reflection"
     elif intent_label == "sleep_recovery":
         support_mode = "recover"
         support_strategy = "sleep_recovery"
@@ -106,6 +141,7 @@ def run_support_mode_router_agent(state: AgentRuntimeState) -> AgentRuntimeState
             "specialist_agent": specialist_agent,
             "routing_reason": routing_reason,
             "contract_name": contract_name,
+            "preferred_support_mode": preferred_support_mode,
         },
     )
     state = append_handoff(

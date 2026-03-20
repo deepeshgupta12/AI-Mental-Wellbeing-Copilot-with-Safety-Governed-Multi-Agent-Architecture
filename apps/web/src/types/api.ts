@@ -313,6 +313,7 @@ export type AgentRuntimeSmokePayload = {
   provider?: "openai" | "ollama" | "mock";
   user_id?: string | null;
   support_track?: string | null;
+  ui_mode?: "reflective" | "calming" | "problem-solving" | "planning" | null;
 };
 
 export type AgentRuntimeSmokeResponse = {

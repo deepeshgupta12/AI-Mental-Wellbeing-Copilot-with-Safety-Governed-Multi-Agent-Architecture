@@ -13,6 +13,7 @@ class AgentRuntimeSmokeRequest(BaseModel):
     provider: Literal["openai", "ollama", "mock"] = "mock"
     user_id: UUID | None = None
     support_track: str | None = None
+    ui_mode: Literal["reflective", "calming", "problem-solving", "planning"] | None = None
 
 
 class RecalledMemoryItemResponse(BaseModel):

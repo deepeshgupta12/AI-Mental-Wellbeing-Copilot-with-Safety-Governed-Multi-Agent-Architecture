@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
@@ -9,41 +8,30 @@ from mental_wellbeing_api.prompts.registry import load_prompt
 from mental_wellbeing_api.services.llm_service import LLMService
 
 
-def _style_prefix(preference_signals: dict[str, str]) -> str:
-    support_style = preference_signals.get("support_style", "").lower()
-    preferred_support_mode = preference_signals.get("preferred_support_mode", "").lower()
-
-    if preferred_support_mode == "plan":
-        return "Let's make this concrete."
-    if preferred_support_mode == "recover":
-        return "Let's keep this calming and restorative."
-    if support_style == "direct":
-        return "I'll keep this practical and clear."
-    if support_style == "reflective":
-        return "I'll stay thoughtful and gentle with this."
-    return ""
-
-
-def _format_follow_up_timing(follow_up_due_at: str | None) -> str | None:
-    if not follow_up_due_at:
-        return None
-
-    try:
-        normalized = follow_up_due_at.replace("Z", "+00:00")
-        parsed = datetime.fromisoformat(normalized)
-        return parsed.strftime("%b %d, %Y at %I:%M %p")
-    except ValueError:
-        return follow_up_due_at
-
-
 def _sanitize_text(value: str | None) -> str:
     if not value:
         return ""
 
     text = value
-    text = re.sub(r"\[(?:mock-response:[^\]]+|mock-response|ollama-error|openai-error|openai-unavailable|unsupported-provider)[^\]]*\]", "", text)
+    text = re.sub(
+        r"\[(?:mock-response:[^\]]+|mock-response|ollama-error|openai-error|openai-unavailable|unsupported-provider)[^\]]*\]",
+        "",
+        text,
+    )
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _normalize_visible_response(text: str) -> str:
+    cleaned = _sanitize_text(text)
+    cleaned = re.sub(
+        r"(Support summary:|Progress:|Patterns:|Intervention trend:|Follow-up:|Reminder timing:|Delivery channel:|Scheduler backend:|Follow-up plan:)",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
 
 
 def _safe_specialist_text(state: AgentRuntimeState) -> str:
@@ -61,7 +49,7 @@ def _safe_specialist_text(state: AgentRuntimeState) -> str:
         "recover": "Let's keep this gentle and focus on one realistic recovery step.",
         "connect": "You do not have to carry this alone. We can think about one safe connection point.",
         "journal": "There may be a pattern here worth naming before trying to solve everything at once.",
-        "plan": "Let's make this smaller and more concrete so it is easier to follow through.",
+        "plan": "Let's make this concrete. We can turn this into a small plan that feels realistic today.",
         "stabilize": "For now, let's focus on getting a little steadier, one moment at a time.",
     }
     return fallback_by_mode.get(
@@ -71,78 +59,67 @@ def _safe_specialist_text(state: AgentRuntimeState) -> str:
 
 
 def _build_mock_final_response(state: AgentRuntimeState) -> str:
-    specialist_response = _safe_specialist_text(state)
+    support_mode = (state.get("support_mode") or "").lower()
+    support_style = (state.get("preference_signals") or {}).get("support_style", "").lower()
     coping_recommendations = state.get("coping_recommendations", [])
-    journaling_insights = state.get("journaling_insights", [])
     follow_up_suggestions = state.get("follow_up_suggestions", [])
-    preference_signals = state.get("preference_signals", {})
-    progress_summary = state.get("progress_summary")
-    recurring_patterns = state.get("recurring_patterns", [])
-    intervention_effectiveness = state.get("intervention_effectiveness", {})
-    support_progress_summary = state.get("support_progress_summary")
 
-    follow_up_required = bool(state.get("follow_up_required", False))
-    follow_up_title = state.get("follow_up_plan_title")
-    follow_up_due_at = state.get("follow_up_due_at")
-    follow_up_delivery_channel = state.get("follow_up_delivery_channel")
-    scheduler_backend = state.get("scheduler_backend")
+    mode_openers = {
+        "reflect": "It sounds like this has been weighing on you.",
+        "activate": "Let's keep this practical and clear.",
+        "reframe": "Let's slow this down and look at it more clearly.",
+        "recover": "Let's keep this gentle and manageable for right now.",
+        "connect": "You do not have to carry this alone.",
+        "journal": "There may be something important here worth naming more clearly.",
+        "plan": "Let's make this concrete.",
+        "stabilize": "Let's focus on the next safe and steady step.",
+    }
 
-    parts: list[str] = []
+    opener = mode_openers.get(
+        support_mode,
+        "I'm here with you, and we can take this one step at a time.",
+    )
 
-    prefix = _style_prefix(preference_signals)
-    if prefix:
-        parts.append(prefix)
+    specialist_text = _safe_specialist_text(state)
 
-    if specialist_response:
-        parts.append(specialist_response)
+    parts: list[str] = [opener]
 
-    if progress_summary:
-        parts.append(f"Progress:\n- {progress_summary}")
-
-    if support_progress_summary:
-        parts.append(f"Support summary:\n- {support_progress_summary}")
-
-    if recurring_patterns:
-        parts.append("Patterns:\n- " + "\n- ".join(recurring_patterns[:2]))
-
-    if coping_recommendations:
-        parts.append("Suggestions:\n- " + "\n- ".join(coping_recommendations[:2]))
-
-    if journaling_insights:
-        parts.append("Insight:\n- " + "\n- ".join(journaling_insights[:2]))
-
-    avg_effectiveness = intervention_effectiveness.get("avg_effectiveness_rating")
-    if avg_effectiveness is not None:
+    if support_mode == "plan":
+        if support_style == "direct":
+            parts.append(
+                "We can make this smaller and more repeatable so it feels easier to follow through."
+            )
+        else:
+            parts.append(
+                "We can turn this into a small plan that feels realistic and not overwhelming."
+            )
+    elif support_mode == "activate":
         parts.append(
-            f"Intervention trend:\n- Average effectiveness so far: {avg_effectiveness}"
+            "Choose one tiny next step today so this feels slightly more manageable."
+        )
+    elif support_mode == "recover":
+        parts.append(
+            "For now, focus on one calming action rather than solving everything at once."
+        )
+    elif support_mode == "reframe":
+        parts.append(
+            "A hard moment does not automatically define the whole picture."
+        )
+    elif support_mode == "reflect":
+        parts.append(
+            "It makes sense that you want to understand this more clearly."
         )
 
-    if follow_up_required:
-        follow_up_lines: list[str] = []
-
-        if follow_up_title:
-            follow_up_lines.append(f"Follow-up plan: {follow_up_title}.")
-        else:
-            follow_up_lines.append("Follow-up plan: Next continuity step prepared.")
-
-        readable_due_at = _format_follow_up_timing(follow_up_due_at)
-        if readable_due_at:
-            follow_up_lines.append(f"Reminder timing: {readable_due_at}.")
-        else:
-            follow_up_lines.append("Reminder timing: scheduled for the next check-in window.")
-
-        if follow_up_delivery_channel:
-            follow_up_lines.append(f"Delivery channel: {follow_up_delivery_channel}.")
-
-        if scheduler_backend:
-            follow_up_lines.append(f"Scheduler backend: {scheduler_backend}.")
-
-        parts.append("Follow-up:\n- " + "\n- ".join(follow_up_lines))
+    if coping_recommendations:
+        parts.append(coping_recommendations[0])
+    elif specialist_text and specialist_text not in parts:
+        parts.append(specialist_text)
 
     if follow_up_suggestions:
-        parts.append("Next:\n- " + follow_up_suggestions[0])
+        parts.append(follow_up_suggestions[0])
 
-    return "\n\n".join(part for part in parts if part).strip()
+    final_text = " ".join(part.strip() for part in parts if part).strip()
+    return _normalize_visible_response(final_text)
 
 
 def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
@@ -204,9 +181,12 @@ def run_response_composer_agent(state: AgentRuntimeState) -> AgentRuntimeState:
 Compose a final user-facing response from the upstream agent outputs.
 Keep it concise, calm, supportive, and clearly non-clinical.
 Prefer the specialist draft when present.
-Use coping recommendations, trend summaries, and follow-up suggestions selectively instead of repeating everything.
 Adapt the tone to the user's support-style preferences when available.
-If a follow-up plan exists, briefly mention the continuity step, reminder timing, and that the next step has been prepared.
+Do not expose internal system metadata, runtime summaries, scheduler details, delivery channels,
+backend names, contracts, queue states, trace data, policy labels, or audit fields.
+Do not list "support summary", "follow-up plan", "delivery channel", "scheduler backend",
+or reminder timestamps in the visible reply.
+Keep the answer natural and conversational.
 """,
     )
 
@@ -223,26 +203,20 @@ If a follow-up plan exists, briefly mention the continuity step, reminder timing
         f"Specialist agent:\n{state.get('specialist_agent', 'reflective_support')}\n\n"
         f"Preference signals:\n{state.get('preference_signals', {})}\n\n"
         f"Primary draft:\n{_safe_specialist_text(state)}\n\n"
-        f"Progress summary:\n{state.get('progress_summary', '')}\n\n"
-        f"Support progress summary:\n{state.get('support_progress_summary', '')}\n\n"
-        f"Recurring patterns:\n{state.get('recurring_patterns', [])}\n\n"
-        f"Intervention effectiveness:\n{state.get('intervention_effectiveness', {})}\n\n"
         f"Coping recommendations:\n{state.get('coping_recommendations', [])}\n\n"
         f"Journaling insights:\n{state.get('journaling_insights', [])}\n\n"
         f"Follow-up suggestions:\n{state.get('follow_up_suggestions', [])}\n\n"
         f"Follow-up required:\n{state.get('follow_up_required', False)}\n\n"
-        f"Follow-up plan title:\n{state.get('follow_up_plan_title', '')}\n\n"
-        f"Follow-up due at:\n{state.get('follow_up_due_at', '')}\n\n"
-        f"Follow-up delivery channel:\n{state.get('follow_up_delivery_channel', '')}\n\n"
-        f"Scheduler backend:\n{state.get('scheduler_backend', '')}\n\n"
-        "Compose the final response."
+        "Write one natural user-facing reply. Keep any continuity mention subtle and non-technical."
     )
-    final_response = _sanitize_text(
+    final_response = _normalize_visible_response(
         llm.generate_text(
             state["provider"],
             system_prompt,
             user_prompt,
             agent_name="response_composer",
+            risk_level=state.get("risk_level"),
+            final_stage=True,
         )
     )
 
