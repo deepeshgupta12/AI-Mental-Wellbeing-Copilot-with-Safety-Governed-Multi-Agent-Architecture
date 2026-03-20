@@ -19,10 +19,12 @@ from mental_wellbeing_api.prompts.registry import (
 from mental_wellbeing_api.schemas.admin import (
     AdminAnalyticsOverviewResponse,
     AdminAuditItemResponse,
+    AdminAuditLogResponse,
     AdminConfigAuditResponse,
     AdminConfigDiffResponse,
     AdminConfigUpdateRequest,
     AdminConfigVersionResponse,
+    AdminEscalationAnalyticsResponse,
     AdminFlaggedSessionDetailResponse,
     AdminFlaggedSessionResponse,
     AdminFollowUpEventResponse,
@@ -32,7 +34,12 @@ from mental_wellbeing_api.schemas.admin import (
     AdminInterventionOverviewResponse,
     AdminOpsOverviewResponse,
     AdminPolicyConfigResponse,
+    AdminReviewerDashboardResponse,
     AdminRoutingRulesResponse,
+    AdminSafetyEventDetailResponse,
+    AdminSafetyEventResponse,
+    AdminSafetyReviewCreateRequest,
+    AdminSafetyReviewResponse,
     AdminSessionLogResponse,
     AdminTraceExecutionDetailResponse,
     AdminTraceExecutionSummaryResponse,
@@ -41,6 +48,7 @@ from mental_wellbeing_api.schemas.admin import (
 )
 from mental_wellbeing_api.services.admin_observability_service import AdminObservabilityService
 from mental_wellbeing_api.services.config_registry_service import ConfigRegistryService
+from mental_wellbeing_api.services.safety_review_service import SafetyReviewService
 from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
 router = APIRouter(
@@ -640,3 +648,107 @@ async def get_analytics_overview(
     service = AdminObservabilityService(session)
     payload = await service.get_analytics_overview()
     return AdminAnalyticsOverviewResponse(**payload)
+
+
+# ---------------------------
+# V3 reviewer / safety queue
+# ---------------------------
+
+
+@router.get("/safety-events", response_model=list[AdminSafetyEventResponse])
+async def get_safety_events(
+    limit: int = 50,
+    queue_status: str | None = None,
+    risk_level: str | None = None,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminSafetyEventResponse]:
+    service = SafetyReviewService(session)
+    return await service.list_safety_events(
+        limit=limit,
+        queue_status=queue_status,
+        risk_level=risk_level,
+    )
+
+
+@router.get("/safety-events/{safety_event_id}", response_model=AdminSafetyEventDetailResponse)
+async def get_safety_event_detail(
+    safety_event_id: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminSafetyEventDetailResponse:
+    service = SafetyReviewService(session)
+    event = await service.get_safety_event(safety_event_id=safety_event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Safety event not found")
+
+    reviews = await service.list_reviews_for_event(safety_event_id=safety_event_id)
+    return AdminSafetyEventDetailResponse(event=event, reviews=reviews)
+
+
+@router.get(
+    "/safety-events/{safety_event_id}/reviews",
+    response_model=list[AdminSafetyReviewResponse],
+)
+async def get_safety_event_reviews(
+    safety_event_id: str,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminSafetyReviewResponse]:
+    service = SafetyReviewService(session)
+    event = await service.get_safety_event(safety_event_id=safety_event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Safety event not found")
+    return await service.list_reviews_for_event(safety_event_id=safety_event_id)
+
+
+@router.post(
+    "/safety-events/{safety_event_id}/reviews",
+    response_model=AdminSafetyReviewResponse,
+    dependencies=[Depends(require_permission("admin:write"))],
+)
+async def create_safety_event_review(
+    safety_event_id: str,
+    payload: AdminSafetyReviewCreateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminSafetyReviewResponse:
+    service = SafetyReviewService(session)
+    try:
+        return await service.create_review(
+            safety_event_id=safety_event_id,
+            reviewer_id=payload.reviewer_id,
+            review_status=payload.review_status,
+            reviewer_note=payload.reviewer_note,
+            human_summary=payload.human_summary,
+            decision_rationale=payload.decision_rationale,
+            resolution_type=payload.resolution_type,
+            escalation_required=payload.escalation_required,
+            escalation_status=payload.escalation_status,
+            review_payload_json=payload.review_payload_json,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/reviewer-dashboard", response_model=AdminReviewerDashboardResponse)
+async def get_reviewer_dashboard(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminReviewerDashboardResponse:
+    service = SafetyReviewService(session)
+    payload = await service.build_reviewer_dashboard()
+    return AdminReviewerDashboardResponse(**payload)
+
+
+@router.get("/escalation-analytics", response_model=AdminEscalationAnalyticsResponse)
+async def get_escalation_analytics(
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminEscalationAnalyticsResponse:
+    service = SafetyReviewService(session)
+    payload = await service.build_escalation_analytics()
+    return AdminEscalationAnalyticsResponse(**payload)
+
+
+@router.get("/audit-timeline", response_model=list[AdminAuditLogResponse])
+async def get_audit_timeline(
+    limit: int = 100,
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[AdminAuditLogResponse]:
+    service = SafetyReviewService(session)
+    return await service.list_audit_timeline(limit=limit)

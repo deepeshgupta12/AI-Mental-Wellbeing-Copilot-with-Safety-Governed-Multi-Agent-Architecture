@@ -92,7 +92,11 @@ class AuthService:
         return base64.urlsafe_b64encode(signature).decode("utf-8").rstrip("=")
 
     def _encode_token(self, payload: dict[str, Any]) -> str:
-        payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        payload_bytes = json.dumps(
+            payload,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
         payload_b64 = base64.urlsafe_b64encode(payload_bytes).decode("utf-8").rstrip("=")
         signature = self._sign(payload_bytes)
         return f"{payload_b64}.{signature}"
@@ -185,6 +189,7 @@ class AuthService:
         role_name: str,
     ) -> OrganizationMembership:
         await self.rbac.ensure_system_roles()
+
         role = await self.rbac.get_role_by_name(role_name)
         if role is None:
             raise HTTPException(status_code=400, detail=f"Unknown role: {role_name}")
@@ -246,6 +251,8 @@ class AuthService:
         role_name: str,
         auth_provider: str,
     ) -> tuple[str, AuthSession, User, Organization, OrganizationMembership, list[str]]:
+        await self.rbac.ensure_system_roles()
+
         user = await self._ensure_user(email=email, display_name=display_name)
 
         resolved_org_name = organization_name or self.settings.enterprise_default_org_name
@@ -301,6 +308,7 @@ class AuthService:
         return access_token, session, user, organization, membership, permissions
 
     async def revoke_session(self, *, session_id: str, reason: str | None = None) -> AuthSession | None:
+        await self.rbac.ensure_enterprise_tables()
         item = await self.session.get(AuthSession, session_id)
         if item is None:
             return None
@@ -316,9 +324,14 @@ class AuthService:
         header_display_name = request.headers.get("X-Dev-Display-Name")
         header_org_slug = request.headers.get("X-Dev-Org-Slug")
         header_org_name = request.headers.get("X-Dev-Org-Name")
-        header_role_name = request.headers.get("X-Dev-Role", self.settings.enterprise_admin_role_name)
+        header_role_name = request.headers.get(
+            "X-Dev-Role",
+            self.settings.enterprise_admin_role_name,
+        )
 
         if self.settings.auth_allow_dev_headers and header_email:
+            await self.rbac.ensure_system_roles()
+
             _, _, _, _, _ = await self.create_dev_session(
                 email=header_email,
                 display_name=header_display_name,
@@ -336,7 +349,11 @@ class AuthService:
             organization = await self.session.scalar(
                 select(Organization).where(
                     Organization.slug
-                    == self._slugify(header_org_slug or header_org_name or self.settings.enterprise_default_org_slug)
+                    == self._slugify(
+                        header_org_slug
+                        or header_org_name
+                        or self.settings.enterprise_default_org_slug
+                    )
                 )
             )
             membership = await self.session.scalar(
@@ -350,7 +367,9 @@ class AuthService:
                     OrganizationMembership.organization_id == organization.id,
                 )
             )
-            permissions = await self.rbac.list_permissions_for_role(membership.role if membership else None)
+            permissions = await self.rbac.list_permissions_for_role(
+                membership.role if membership else None
+            )
 
             return RequestContext(
                 is_authenticated=True,
@@ -365,18 +384,11 @@ class AuthService:
                 session=None,
             )
 
-        all_permissions = sorted(
-            {
-                permission
-                for permissions in RBACService.DEFAULT_ROLE_PERMISSIONS.values()
-                for permission in permissions
-            }
-        )
         return RequestContext(
             is_authenticated=True,
             auth_mode=self.settings.auth_mode,
             auth_subject="development_bypass",
-            permissions=all_permissions,
+            permissions=RBACService.all_default_permissions(),
             deployment_name=self.settings.deployment_name,
             user=None,
             organization=None,
@@ -391,9 +403,9 @@ class AuthService:
         request: Request,
         bearer_token: str | None,
     ) -> RequestContext:
-        await self.rbac.ensure_system_roles()
-
         if bearer_token:
+            await self.rbac.ensure_enterprise_tables()
+
             payload = self._decode_token(bearer_token)
             token_hash = self._token_hash(bearer_token)
 

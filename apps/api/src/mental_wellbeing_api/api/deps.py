@@ -46,6 +46,12 @@ def require_permission(permission_key: str) -> Callable[..., RequestContext]:
     async def permission_dep(
         context: RequestContext = Depends(request_context_dep),
     ) -> RequestContext:
+        if not context.is_authenticated:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+            )
+
         if not RBACService.has_permission(permission_key, context.permissions):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

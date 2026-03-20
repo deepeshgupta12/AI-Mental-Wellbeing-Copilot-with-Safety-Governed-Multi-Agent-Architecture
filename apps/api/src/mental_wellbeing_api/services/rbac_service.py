@@ -6,7 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from mental_wellbeing_api.models.organization import Role, RolePermission
+from mental_wellbeing_api.db.base import Base
+from mental_wellbeing_api.models.auth_session import AuthSession
+from mental_wellbeing_api.models.organization import (
+    Organization,
+    OrganizationMembership,
+    Role,
+    RolePermission,
+)
 
 
 class RBACService:
@@ -45,7 +52,31 @@ class RBACService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def ensure_enterprise_tables(self) -> None:
+        """
+        Pack 1 must not break pre-existing V1-V3 tests that may run without
+        a fresh alembic upgrade path for the newly introduced enterprise tables.
+        This creates only the Pack 1 foundation tables if they do not exist yet.
+        """
+        conn = await self.session.connection()
+
+        await conn.run_sync(
+            lambda sync_conn: Base.metadata.create_all(
+                bind=sync_conn,
+                tables=[
+                    Organization.__table__,
+                    Role.__table__,
+                    RolePermission.__table__,
+                    OrganizationMembership.__table__,
+                    AuthSession.__table__,
+                ],
+                checkfirst=True,
+            )
+        )
+
     async def ensure_system_roles(self) -> None:
+        await self.ensure_enterprise_tables()
+
         existing_roles = list(
             (
                 await self.session.scalars(
@@ -86,6 +117,7 @@ class RBACService:
             await self.session.commit()
 
     async def get_role_by_name(self, role_name: str) -> Role | None:
+        await self.ensure_enterprise_tables()
         return await self.session.scalar(
             select(Role)
             .options(selectinload(Role.permissions))
@@ -104,3 +136,13 @@ class RBACService:
     @staticmethod
     def has_permission(permission_key: str, granted_permissions: Iterable[str]) -> bool:
         return permission_key in set(granted_permissions)
+
+    @classmethod
+    def all_default_permissions(cls) -> list[str]:
+        return sorted(
+            {
+                permission
+                for permissions in cls.DEFAULT_ROLE_PERMISSIONS.values()
+                for permission in permissions
+            }
+        )
