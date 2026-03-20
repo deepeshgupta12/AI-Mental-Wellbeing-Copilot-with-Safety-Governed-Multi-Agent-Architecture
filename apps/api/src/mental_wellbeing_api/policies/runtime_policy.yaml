@@ -1,18 +1,15 @@
 service:
   name: mental-wellbeing-api
-  version: "0.1.0"
-
+  version: 0.1.0
 safety:
   crisis_override_enabled: true
   high_risk_requires_safe_redirect: true
   medium_risk_prefers_stabilization: true
   diagnosis_language_blocked: true
-
 memory:
   vector_recall_enabled: true
   recall_limit_default: 3
   fallback_to_recency: true
-
 routing:
   contract_name: v2-routing-core
   default_intent: general_reflection
@@ -20,13 +17,13 @@ routing:
   medium_risk_strategy: distress_stabilization
   direct_style_action_bias: true
   behavioral_activation_hints:
-    - stuck
-    - no motivation
-    - can't start
-    - tired
-    - exhausted
-    - avoid
-    - procrastinating
+  - stuck
+  - no motivation
+  - can't start
+  - tired
+  - exhausted
+  - avoid
+  - procrastinating
   specialist_map:
     sleep_recovery: sleep_recovery
     social_support: social_support
@@ -35,12 +32,10 @@ routing:
     habit_support: habit_care_plan
     stress_overwhelm: behavioral_activation
     general_reflection: reflective_support
-
 response:
   max_final_response_chars: 1200
   concise_style_default: true
   non_clinical_required: true
-
 followups:
   enabled: true
   scheduler_backend: local_contract
@@ -58,16 +53,15 @@ followups:
     stabilize: 6
     default: 24
   completion_outcomes:
-    - completed
-    - helpful
-    - acknowledged
-    - skipped
-    - cancelled
-    - failed
+  - completed
+  - helpful
+  - acknowledged
+  - skipped
+  - cancelled
+  - failed
   retry_policy:
     max_attempts: 3
     backoff_seconds: 300
-
 scheduling:
   enabled: true
   backend: local_contract
@@ -76,7 +70,6 @@ scheduling:
   workflow_name_default: follow_up_reminder_workflow
   task_queue_default: mental-wellbeing-followups
   idempotency_key_prefix: followup
-
 admin:
   flagged_sessions_enabled: true
   session_logs_enabled: true
@@ -87,14 +80,12 @@ admin:
   intervention_logs_enabled: true
   config_registry_enabled: true
   analytics_overview_enabled: true
-
 models:
   risk_tier_gating:
     high_risk_provider: openai
     high_risk_model: gpt-4o-mini
     final_response_provider: openai
     final_response_model: gpt-4o-mini
-
   agent_assignments:
     input_structuring:
       provider: openai
@@ -126,7 +117,6 @@ models:
     response_composer:
       provider: openai
       model: gpt-4o-mini
-
 classifiers:
   local_prescreen_enabled: true
   local_prescreen_mode: advisory_only
