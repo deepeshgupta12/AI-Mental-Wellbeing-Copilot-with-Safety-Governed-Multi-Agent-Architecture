@@ -11,12 +11,14 @@ from mental_wellbeing_api.models.safety_event import SafetyEvent
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
 from mental_wellbeing_api.models.safety_review import SafetyReview
 from mental_wellbeing_api.services.audit_log_service import AuditLogService
+from mental_wellbeing_api.services.storage_service import StorageService
 
 
 class SafetyReviewService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.audit = AuditLogService(session)
+        self.storage = StorageService(session)
 
     async def create_safety_event(
         self,
@@ -72,6 +74,33 @@ class SafetyReviewService:
                 "queue_status": item.queue_status,
             },
         )
+
+        if evidence_json is not None:
+            await self.storage.persist_json_artifact(
+                scope_type="safety_event",
+                scope_id=item.id,
+                artifact_kind="evidence_json",
+                file_name=f"safety-event-evidence-{item.id}.json",
+                payload=evidence_json,
+                metadata_json={
+                    "risk_level": item.risk_level,
+                    "event_type": item.event_type,
+                },
+            )
+
+        if event_payload_json is not None:
+            await self.storage.persist_json_artifact(
+                scope_type="safety_event",
+                scope_id=item.id,
+                artifact_kind="event_payload_json",
+                file_name=f"safety-event-payload-{item.id}.json",
+                payload=event_payload_json,
+                metadata_json={
+                    "risk_level": item.risk_level,
+                    "event_type": item.event_type,
+                },
+            )
+
         return item
 
     async def list_safety_events(
@@ -202,6 +231,20 @@ class SafetyReviewService:
                 "review_status": review_status,
             },
         )
+
+        if review_payload_json:
+            await self.storage.persist_json_artifact(
+                scope_type="safety_review",
+                scope_id=item.id,
+                artifact_kind="review_payload_json",
+                file_name=f"safety-review-payload-{item.id}.json",
+                payload=review_payload_json,
+                metadata_json={
+                    "review_status": item.review_status,
+                    "resolution_type": item.resolution_type,
+                },
+            )
+
         return item
 
     async def build_reviewer_dashboard(self) -> dict[str, Any]:

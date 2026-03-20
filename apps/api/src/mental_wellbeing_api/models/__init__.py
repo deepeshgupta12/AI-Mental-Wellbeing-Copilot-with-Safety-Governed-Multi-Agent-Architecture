@@ -11,6 +11,7 @@ from mental_wellbeing_api.models.organization import (
     RolePermission,
 )
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
+from mental_wellbeing_api.models.stored_artifact import StoredArtifact
 from mental_wellbeing_api.models.user import User, UserProfile
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "Role",
     "RolePermission",
     "SafetyFlag",
+    "StoredArtifact",
     "User",
     "UserProfile",
 ]

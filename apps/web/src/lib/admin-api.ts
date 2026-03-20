@@ -26,6 +26,73 @@ import type {
   ResolvedEnterpriseSettings,
 } from "@/types/api";
 
+export type AdminInfrastructureSummary = {
+  deployment_name: string;
+  organization_id?: string | null;
+  storage: {
+    provider: string;
+    local_root?: string | null;
+    bucket_name?: string | null;
+    region?: string | null;
+    endpoint_url?: string | null;
+    audit_artifact_prefix: string;
+    safety_artifact_prefix: string;
+    attachment_prefix: string;
+    stage_remote_writes_locally: boolean;
+    artifact_base_uri: string;
+    write_mode: string;
+  };
+  secrets: {
+    backend: string;
+    namespace?: string | null;
+    prefix?: string | null;
+    configured_keys: string[];
+    missing_keys: string[];
+    redacted: boolean;
+  };
+  queue: {
+    scheduler_backend: string;
+    temporal_enabled: boolean;
+    temporal_namespace: string;
+    temporal_task_queue: string;
+    max_attempts: number;
+    dead_letter_enabled: boolean;
+    max_inflight: number;
+    visibility_timeout_seconds: number;
+    enforce_idempotency: boolean;
+  };
+  file_handling: {
+    max_attachment_bytes: number;
+    allowed_attachment_content_types: string[];
+    sanitize_filenames: boolean;
+    quarantine_prefix: string;
+  };
+  cloud: {
+    deployment_profile: string;
+    config_source: string;
+    object_storage_mode: string;
+    public_base_url?: string | null;
+  };
+};
+
+export type StoredArtifact = {
+  id: string;
+  scope_type: string;
+  scope_id: string;
+  artifact_kind: string;
+  file_name: string;
+  content_type: string;
+  storage_provider: string;
+  bucket_name?: string | null;
+  object_key: string;
+  storage_uri: string;
+  local_path?: string | null;
+  byte_size: number;
+  checksum_sha256: string;
+  metadata_json?: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export function getAdminFlaggedSessions(): Promise<AdminFlaggedSession[]> {
   return apiRequest<AdminFlaggedSession[]>("/api/v1/admin/flagged-sessions");
 }
@@ -236,4 +303,29 @@ export function getAdminResolvedEnterpriseSettings(
 ): Promise<ResolvedEnterpriseSettings> {
   const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
   return apiRequest<ResolvedEnterpriseSettings>(`/api/v1/admin/settings/resolved${query}`);
+}
+
+export function getAdminInfrastructureSummary(
+  organizationId?: string | null,
+): Promise<AdminInfrastructureSummary> {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<AdminInfrastructureSummary>(
+    `/api/v1/admin/settings/infrastructure/summary${query}`,
+  );
+}
+
+export function getAdminStoredArtifacts(params?: {
+  limit?: number;
+  scopeType?: string;
+  scopeId?: string;
+  artifactKind?: string;
+}): Promise<StoredArtifact[]> {
+  const search = new URLSearchParams();
+  if (params?.limit) search.set("limit", String(params.limit));
+  if (params?.scopeType) search.set("scope_type", params.scopeType);
+  if (params?.scopeId) search.set("scope_id", params.scopeId);
+  if (params?.artifactKind) search.set("artifact_kind", params.artifactKind);
+
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiRequest<StoredArtifact[]>(`/api/v1/admin/settings/infrastructure/artifacts${suffix}`);
 }

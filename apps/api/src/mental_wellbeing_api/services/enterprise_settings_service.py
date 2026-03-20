@@ -40,6 +40,48 @@ class EnterpriseSettingsService:
                 "auth_requires_token": self.settings.auth_requires_token,
                 "temporal_enabled": self.settings.temporal_enabled,
                 "scheduler_backend": self.settings.scheduler_backend,
+                "storage": {
+                    "provider": self.settings.storage_provider,
+                    "local_root": str(self.settings.storage_local_root_path),
+                    "bucket_name": self.settings.storage_artifact_bucket or None,
+                    "region": self.settings.storage_region or None,
+                    "endpoint_url": self.settings.storage_endpoint_url or None,
+                    "audit_artifact_prefix": self.settings.storage_audit_artifact_prefix,
+                    "safety_artifact_prefix": self.settings.storage_safety_artifact_prefix,
+                    "attachment_prefix": self.settings.storage_attachment_prefix,
+                    "stage_remote_writes_locally": self.settings.storage_stage_remote_writes_locally,
+                },
+                "secrets": {
+                    "backend": self.settings.secret_backend,
+                    "namespace": self.settings.managed_secret_namespace,
+                    "prefix": self.settings.managed_secret_prefix or None,
+                    "managed_secret_keys": [
+                        "OPENAI_API_KEY",
+                        "AUTH_SESSION_SECRET",
+                        "STORAGE_ACCESS_KEY_ID",
+                        "STORAGE_SECRET_ACCESS_KEY",
+                    ],
+                },
+                "queue_hardening": {
+                    "max_attempts": self.settings.queue_max_attempts,
+                    "dead_letter_enabled": self.settings.queue_dead_letter_enabled,
+                    "max_inflight": self.settings.queue_max_inflight,
+                    "visibility_timeout_seconds": self.settings.queue_visibility_timeout_seconds,
+                    "enforce_idempotency": self.settings.queue_enforce_idempotency,
+                    "temporal_namespace": self.settings.temporal_namespace,
+                    "temporal_task_queue": self.settings.temporal_task_queue,
+                },
+                "file_handling": {
+                    "max_attachment_bytes": self.settings.file_max_attachment_bytes,
+                    "allowed_attachment_content_types": self.settings.file_allowed_attachment_content_types_list,
+                    "sanitize_filenames": True,
+                    "quarantine_prefix": self.settings.file_quarantine_prefix,
+                },
+                "cloud": {
+                    "deployment_profile": self.settings.cloud_deployment_profile,
+                    "config_source": self.settings.cloud_config_source,
+                    "object_storage_mode": self.settings.storage_provider,
+                },
             },
             "governance": {
                 "escalation_policy": {
@@ -61,6 +103,7 @@ class EnterpriseSettingsService:
                     "allow_runtime_policy_edits": True,
                     "allow_prompt_registry_edits": True,
                     "allow_routing_rule_edits": True,
+                    "allow_enterprise_settings_edits": True,
                 },
             },
         }
@@ -72,6 +115,9 @@ class EnterpriseSettingsService:
                 "escalation_policy_overrides": {},
                 "model_provider_policy_overrides": {},
                 "feature_flags": {},
+                "storage_policy_overrides": {},
+                "queue_hardening_overrides": {},
+                "file_handling_overrides": {},
             },
         }
 
@@ -79,20 +125,92 @@ class EnterpriseSettingsService:
         normalized = deepcopy(payload)
         normalized.setdefault("deployment", {})
         normalized.setdefault("governance", {})
-        normalized["deployment"].setdefault("name", self.settings.deployment_name)
-        normalized["deployment"].setdefault("app_env", self.settings.app_env)
-        normalized["deployment"].setdefault("auth_mode", self.settings.auth_mode)
-        normalized["deployment"].setdefault(
-            "auth_requires_token",
-            self.settings.auth_requires_token,
+
+        deployment = normalized["deployment"]
+        deployment.setdefault("name", self.settings.deployment_name)
+        deployment.setdefault("app_env", self.settings.app_env)
+        deployment.setdefault("auth_mode", self.settings.auth_mode)
+        deployment.setdefault("auth_requires_token", self.settings.auth_requires_token)
+        deployment.setdefault("temporal_enabled", self.settings.temporal_enabled)
+        deployment.setdefault("scheduler_backend", self.settings.scheduler_backend)
+        deployment.setdefault("storage", {})
+        deployment.setdefault("secrets", {})
+        deployment.setdefault("queue_hardening", {})
+        deployment.setdefault("file_handling", {})
+        deployment.setdefault("cloud", {})
+
+        deployment["storage"].setdefault("provider", self.settings.storage_provider)
+        deployment["storage"].setdefault("local_root", str(self.settings.storage_local_root_path))
+        deployment["storage"].setdefault("bucket_name", self.settings.storage_artifact_bucket or None)
+        deployment["storage"].setdefault("region", self.settings.storage_region or None)
+        deployment["storage"].setdefault("endpoint_url", self.settings.storage_endpoint_url or None)
+        deployment["storage"].setdefault("audit_artifact_prefix", self.settings.storage_audit_artifact_prefix)
+        deployment["storage"].setdefault("safety_artifact_prefix", self.settings.storage_safety_artifact_prefix)
+        deployment["storage"].setdefault("attachment_prefix", self.settings.storage_attachment_prefix)
+        deployment["storage"].setdefault(
+            "stage_remote_writes_locally",
+            self.settings.storage_stage_remote_writes_locally,
         )
-        normalized["deployment"].setdefault("temporal_enabled", self.settings.temporal_enabled)
-        normalized["deployment"].setdefault("scheduler_backend", self.settings.scheduler_backend)
+
+        deployment["secrets"].setdefault("backend", self.settings.secret_backend)
+        deployment["secrets"].setdefault("namespace", self.settings.managed_secret_namespace)
+        deployment["secrets"].setdefault("prefix", self.settings.managed_secret_prefix or None)
+        deployment["secrets"].setdefault(
+            "managed_secret_keys",
+            [
+                "OPENAI_API_KEY",
+                "AUTH_SESSION_SECRET",
+                "STORAGE_ACCESS_KEY_ID",
+                "STORAGE_SECRET_ACCESS_KEY",
+            ],
+        )
+
+        deployment["queue_hardening"].setdefault("max_attempts", self.settings.queue_max_attempts)
+        deployment["queue_hardening"].setdefault(
+            "dead_letter_enabled",
+            self.settings.queue_dead_letter_enabled,
+        )
+        deployment["queue_hardening"].setdefault("max_inflight", self.settings.queue_max_inflight)
+        deployment["queue_hardening"].setdefault(
+            "visibility_timeout_seconds",
+            self.settings.queue_visibility_timeout_seconds,
+        )
+        deployment["queue_hardening"].setdefault(
+            "enforce_idempotency",
+            self.settings.queue_enforce_idempotency,
+        )
+        deployment["queue_hardening"].setdefault(
+            "temporal_namespace",
+            self.settings.temporal_namespace,
+        )
+        deployment["queue_hardening"].setdefault(
+            "temporal_task_queue",
+            self.settings.temporal_task_queue,
+        )
+
+        deployment["file_handling"].setdefault(
+            "max_attachment_bytes",
+            self.settings.file_max_attachment_bytes,
+        )
+        deployment["file_handling"].setdefault(
+            "allowed_attachment_content_types",
+            self.settings.file_allowed_attachment_content_types_list,
+        )
+        deployment["file_handling"].setdefault("sanitize_filenames", True)
+        deployment["file_handling"].setdefault(
+            "quarantine_prefix",
+            self.settings.file_quarantine_prefix,
+        )
+
+        deployment["cloud"].setdefault("deployment_profile", self.settings.cloud_deployment_profile)
+        deployment["cloud"].setdefault("config_source", self.settings.cloud_config_source)
+        deployment["cloud"].setdefault("object_storage_mode", self.settings.storage_provider)
 
         governance = normalized["governance"]
         governance.setdefault("escalation_policy", {})
         governance.setdefault("model_provider_policy", {})
         governance.setdefault("managed_config", {})
+
         return normalized
 
     def _normalize_organization_payload(
@@ -107,6 +225,9 @@ class EnterpriseSettingsService:
         governance.setdefault("escalation_policy_overrides", {})
         governance.setdefault("model_provider_policy_overrides", {})
         governance.setdefault("feature_flags", {})
+        governance.setdefault("storage_policy_overrides", {})
+        governance.setdefault("queue_hardening_overrides", {})
+        governance.setdefault("file_handling_overrides", {})
         return normalized
 
     def _deep_merge(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -164,7 +285,7 @@ class EnterpriseSettingsService:
             is_active=True,
             created_by=actor,
             updated_by=actor,
-            change_note="Bootstrap Pack 2 governance settings",
+            change_note="Bootstrap Pack 2/3 governance settings",
         )
         self.session.add(row)
         await self.session.commit()
@@ -225,6 +346,13 @@ class EnterpriseSettingsService:
         organization_payload: dict[str, Any] | None = None
         effective = deepcopy(deployment_payload)
 
+        effective.setdefault("deployment", {})
+        effective["deployment"].setdefault("storage", {})
+        effective["deployment"].setdefault("secrets", {})
+        effective["deployment"].setdefault("queue_hardening", {})
+        effective["deployment"].setdefault("file_handling", {})
+        effective["deployment"].setdefault("cloud", {})
+
         if organization_id:
             organization_row = await self.get_organization_settings(organization_id)
             organization_payload = deepcopy(organization_row.payload_json)
@@ -233,6 +361,9 @@ class EnterpriseSettingsService:
             escalation_overrides = organization_governance.get("escalation_policy_overrides", {})
             provider_overrides = organization_governance.get("model_provider_policy_overrides", {})
             feature_flags = organization_governance.get("feature_flags", {})
+            storage_overrides = organization_governance.get("storage_policy_overrides", {})
+            queue_overrides = organization_governance.get("queue_hardening_overrides", {})
+            file_overrides = organization_governance.get("file_handling_overrides", {})
 
             effective.setdefault("governance", {})
             effective["governance"].setdefault("escalation_policy", {})
@@ -253,6 +384,21 @@ class EnterpriseSettingsService:
                 effective["governance"]["feature_flags"] = self._deep_merge(
                     effective["governance"]["feature_flags"],
                     feature_flags,
+                )
+            if isinstance(storage_overrides, dict):
+                effective["deployment"]["storage"] = self._deep_merge(
+                    effective["deployment"]["storage"],
+                    storage_overrides,
+                )
+            if isinstance(queue_overrides, dict):
+                effective["deployment"]["queue_hardening"] = self._deep_merge(
+                    effective["deployment"]["queue_hardening"],
+                    queue_overrides,
+                )
+            if isinstance(file_overrides, dict):
+                effective["deployment"]["file_handling"] = self._deep_merge(
+                    effective["deployment"]["file_handling"],
+                    file_overrides,
                 )
 
         return {

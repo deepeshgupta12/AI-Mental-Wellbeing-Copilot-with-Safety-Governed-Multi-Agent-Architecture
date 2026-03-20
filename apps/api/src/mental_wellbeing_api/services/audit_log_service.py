@@ -5,11 +5,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.audit_log import AuditLog
+from mental_wellbeing_api.services.storage_service import StorageService
 
 
 class AuditLogService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.storage = StorageService(session)
 
     async def create_log(
         self,
@@ -48,4 +50,26 @@ class AuditLogService:
         self.session.add(item)
         await self.session.commit()
         await self.session.refresh(item)
+
+        if before_json is not None or after_json is not None or event_payload_json is not None:
+            await self.storage.persist_json_artifact(
+                scope_type="audit_log",
+                scope_id=item.id,
+                artifact_kind="audit_snapshot",
+                file_name=f"audit-log-{item.id}.json",
+                payload={
+                    "event_type": event_type,
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                    "before_json": before_json,
+                    "after_json": after_json,
+                    "event_payload_json": event_payload_json,
+                },
+                metadata_json={
+                    "event_type": event_type,
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                },
+            )
+
         return item

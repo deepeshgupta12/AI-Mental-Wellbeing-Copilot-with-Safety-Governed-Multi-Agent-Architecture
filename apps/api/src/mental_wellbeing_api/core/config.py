@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -89,6 +90,67 @@ class Settings(BaseSettings):
         alias="ENTERPRISE_ADMIN_ROLE_NAME",
     )
 
+    # -----------------------------
+    # V4 Pack 3 storage / secrets / cloud hardening
+    # -----------------------------
+    storage_provider: str = Field(default="local", alias="STORAGE_PROVIDER")
+    storage_local_root: str = Field(default=".runtime/storage", alias="STORAGE_LOCAL_ROOT")
+    storage_public_base_url: str | None = Field(default=None, alias="STORAGE_PUBLIC_BASE_URL")
+    storage_artifact_bucket: str = Field(default="", alias="STORAGE_ARTIFACT_BUCKET")
+    storage_region: str = Field(default="", alias="STORAGE_REGION")
+    storage_endpoint_url: str = Field(default="", alias="STORAGE_ENDPOINT_URL")
+    storage_access_key_id: str = Field(default="", alias="STORAGE_ACCESS_KEY_ID")
+    storage_secret_access_key: str = Field(default="", alias="STORAGE_SECRET_ACCESS_KEY")
+    storage_force_path_style: bool = Field(default=False, alias="STORAGE_FORCE_PATH_STYLE")
+    storage_stage_remote_writes_locally: bool = Field(
+        default=True,
+        alias="STORAGE_STAGE_REMOTE_WRITES_LOCALLY",
+    )
+    storage_audit_artifact_prefix: str = Field(
+        default="audit-artifacts",
+        alias="STORAGE_AUDIT_ARTIFACT_PREFIX",
+    )
+    storage_safety_artifact_prefix: str = Field(
+        default="safety-artifacts",
+        alias="STORAGE_SAFETY_ARTIFACT_PREFIX",
+    )
+    storage_attachment_prefix: str = Field(
+        default="attachments",
+        alias="STORAGE_ATTACHMENT_PREFIX",
+    )
+
+    secret_backend: str = Field(default="env", alias="SECRET_BACKEND")
+    managed_secret_namespace: str = Field(
+        default="mental-wellbeing",
+        alias="MANAGED_SECRET_NAMESPACE",
+    )
+    managed_secret_prefix: str = Field(default="", alias="MANAGED_SECRET_PREFIX")
+
+    queue_max_attempts: int = Field(default=3, alias="QUEUE_MAX_ATTEMPTS")
+    queue_dead_letter_enabled: bool = Field(default=True, alias="QUEUE_DEAD_LETTER_ENABLED")
+    queue_max_inflight: int = Field(default=100, alias="QUEUE_MAX_INFLIGHT")
+    queue_visibility_timeout_seconds: int = Field(
+        default=900,
+        alias="QUEUE_VISIBILITY_TIMEOUT_SECONDS",
+    )
+    queue_enforce_idempotency: bool = Field(
+        default=True,
+        alias="QUEUE_ENFORCE_IDEMPOTENCY",
+    )
+
+    file_max_attachment_bytes: int = Field(
+        default=10 * 1024 * 1024,
+        alias="FILE_MAX_ATTACHMENT_BYTES",
+    )
+    file_allowed_attachment_content_types: str = Field(
+        default="application/json,text/plain,text/markdown",
+        alias="FILE_ALLOWED_ATTACHMENT_CONTENT_TYPES",
+    )
+    file_quarantine_prefix: str = Field(default="quarantine", alias="FILE_QUARANTINE_PREFIX")
+
+    cloud_deployment_profile: str = Field(default="local", alias="CLOUD_DEPLOYMENT_PROFILE")
+    cloud_config_source: str = Field(default="env", alias="CLOUD_CONFIG_SOURCE")
+
     @property
     def database_url(self) -> str:
         return (
@@ -107,6 +169,18 @@ class Settings(BaseSettings):
             for origin in self.cors_allow_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def file_allowed_attachment_content_types_list(self) -> list[str]:
+        return [
+            item.strip()
+            for item in self.file_allowed_attachment_content_types.split(",")
+            if item.strip()
+        ]
+
+    @property
+    def storage_local_root_path(self) -> Path:
+        return Path(self.storage_local_root).expanduser().resolve()
 
     @property
     def is_production_like(self) -> bool:

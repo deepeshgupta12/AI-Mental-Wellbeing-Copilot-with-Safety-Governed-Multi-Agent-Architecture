@@ -25,6 +25,9 @@ apps/api/.venv/
 .env.*.local
 apps/api/.env
 
+# Runtime storage
+.runtime/
+
 # Logs
 *.log
 

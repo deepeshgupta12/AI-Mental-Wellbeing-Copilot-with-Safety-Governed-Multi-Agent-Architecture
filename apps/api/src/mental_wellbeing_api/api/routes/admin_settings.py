@@ -11,8 +11,15 @@ from mental_wellbeing_api.schemas.governance import (
     EnterpriseSettingUpdateRequest,
     ResolvedEnterpriseSettingsResponse,
 )
+from mental_wellbeing_api.schemas.infrastructure import (
+    InfrastructureRuntimeSummaryResponse,
+    StoredArtifactResponse,
+)
 from mental_wellbeing_api.services.auth_service import RequestContext
 from mental_wellbeing_api.services.enterprise_settings_service import EnterpriseSettingsService
+from mental_wellbeing_api.services.infrastructure_governance_service import (
+    InfrastructureGovernanceService,
+)
 
 router = APIRouter(
     prefix="/admin/settings",
@@ -100,3 +107,30 @@ async def get_resolved_enterprise_settings(
     service = EnterpriseSettingsService(session)
     payload = await service.resolve_settings(organization_id=organization_id)
     return ResolvedEnterpriseSettingsResponse(**payload)
+
+
+@router.get("/infrastructure/summary", response_model=InfrastructureRuntimeSummaryResponse)
+async def get_infrastructure_runtime_summary(
+    organization_id: str | None = Query(default=None),
+    session: AsyncSession = Depends(db_session_dep),
+) -> InfrastructureRuntimeSummaryResponse:
+    service = InfrastructureGovernanceService(session)
+    payload = await service.build_runtime_summary(organization_id=organization_id)
+    return InfrastructureRuntimeSummaryResponse(**payload)
+
+
+@router.get("/infrastructure/artifacts", response_model=list[StoredArtifactResponse])
+async def list_recent_infrastructure_artifacts(
+    limit: int = Query(default=50, ge=1, le=200),
+    scope_type: str | None = Query(default=None),
+    scope_id: str | None = Query(default=None),
+    artifact_kind: str | None = Query(default=None),
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[StoredArtifactResponse]:
+    service = InfrastructureGovernanceService(session)
+    return await service.list_recent_artifacts(
+        limit=limit,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        artifact_kind=artifact_kind,
+    )
