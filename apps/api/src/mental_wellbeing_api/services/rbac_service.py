@@ -4,7 +4,6 @@ from collections.abc import Iterable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from mental_wellbeing_api.db.base import Base
 from mental_wellbeing_api.models.auth_session import AuthSession
@@ -74,13 +73,21 @@ class RBACService:
             )
         )
 
+    async def _get_permission_keys_for_role_id(self, role_id: str) -> set[str]:
+        rows = (
+            await self.session.execute(
+                select(RolePermission.permission_key).where(RolePermission.role_id == role_id)
+            )
+        ).all()
+        return {str(row[0]) for row in rows if row[0]}
+
     async def ensure_system_roles(self) -> None:
         await self.ensure_enterprise_tables()
 
         existing_roles = list(
             (
                 await self.session.scalars(
-                    select(Role).options(selectinload(Role.permissions))
+                    select(Role)
                 )
             ).all()
         )
@@ -90,6 +97,7 @@ class RBACService:
 
         for role_name, permission_keys in self.DEFAULT_ROLE_PERMISSIONS.items():
             role = existing_by_name.get(role_name)
+
             if role is None:
                 role = Role(
                     name=role_name,
@@ -100,9 +108,11 @@ class RBACService:
                 )
                 self.session.add(role)
                 await self.session.flush()
+                existing_permissions: set[str] = set()
                 changed = True
+            else:
+                existing_permissions = await self._get_permission_keys_for_role_id(role.id)
 
-            existing_permissions = {item.permission_key for item in role.permissions}
             for permission_key in permission_keys:
                 if permission_key not in existing_permissions:
                     self.session.add(
@@ -119,19 +129,14 @@ class RBACService:
     async def get_role_by_name(self, role_name: str) -> Role | None:
         await self.ensure_enterprise_tables()
         return await self.session.scalar(
-            select(Role)
-            .options(selectinload(Role.permissions))
-            .where(Role.name == role_name)
+            select(Role).where(Role.name == role_name)
         )
 
     async def list_permissions_for_role(self, role: Role | None) -> list[str]:
         if role is None:
             return []
-        if not role.permissions:
-            role = await self.get_role_by_name(role.name)
-            if role is None:
-                return []
-        return sorted({item.permission_key for item in role.permissions})
+        permission_keys = await self._get_permission_keys_for_role_id(role.id)
+        return sorted(permission_keys)
 
     @staticmethod
     def has_permission(permission_key: str, granted_permissions: Iterable[str]) -> bool:
