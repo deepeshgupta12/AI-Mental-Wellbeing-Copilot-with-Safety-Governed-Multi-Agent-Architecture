@@ -46,6 +46,10 @@ const suggestedPrompts = [
   "I'm feeling low today — what can I try?",
 ];
 
+function mapModeToUiMode(mode: LocalMode): LocalMode {
+  return mode;
+}
+
 function ChatPageContent() {
   const searchParams = useSearchParams();
 
@@ -120,9 +124,10 @@ function ChatPageContent() {
 
       const runtimeResponse = await runAgentRuntimeSmoke({
         user_input: content,
-        provider: "mock",
+        provider: "openai",
         user_id: userId,
         support_track: supportTrack,
+        ui_mode: mapModeToUiMode(currentMode),
       });
 
       await createConversationMessage({

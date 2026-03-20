@@ -21,6 +21,8 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         ]
     ).lower()
 
+    support_track = (state.get("support_track") or "").strip().lower()
+
     policy = load_runtime_policy()
     routing_policy = policy.get("routing", {}) if isinstance(policy, dict) else {}
     rules = load_routing_rules()
@@ -34,7 +36,23 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     journaling_reflection_hints = list(intent_rules.get("journaling_reflection_hints", []))
     cognitive_reframe_hints = list(intent_rules.get("cognitive_reframe_hints", []))
 
-    if _contains_any(text, sleep_hints):
+    if support_track in {
+        "stress_overwhelm",
+        "sleep_recovery",
+        "journaling_reflection",
+        "social_support",
+        "habit_support",
+    }:
+        track_to_intent = {
+            "stress_overwhelm": "stress_overwhelm",
+            "sleep_recovery": "sleep_recovery",
+            "journaling_reflection": "journaling_insight",
+            "social_support": "social_support",
+            "habit_support": "habit_support",
+        }
+        intent_label = track_to_intent[support_track]
+        routing_reason = f"support track '{support_track}' selected"
+    elif _contains_any(text, sleep_hints):
         intent_label = "sleep_recovery"
         routing_reason = "sleep-oriented cues detected"
     elif _contains_any(text, social_hints):
@@ -61,9 +79,9 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     contract_name = str(routing_policy.get("contract_name", "v2-routing-core"))
 
     state = {
-        **state,
-        "intent_label": intent_label,
-        "routing_reason": routing_reason,
+      **state,
+      "intent_label": intent_label,
+      "routing_reason": routing_reason,
     }
     state = set_routing_contract(
         state,
@@ -80,6 +98,7 @@ def run_intent_router_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             "intent_label": intent_label,
             "routing_reason": routing_reason,
             "contract_name": contract_name,
+            "support_track": support_track,
         },
     )
     state = append_handoff(

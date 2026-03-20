@@ -47,6 +47,28 @@ class AgentRuntimeService:
     ) -> SafetyEvaluationResponse:
         return self.safety_service.evaluate_text(payload.user_input)
 
+    def _apply_ui_mode_overrides(
+        self,
+        *,
+        preference_signals: dict[str, str],
+        ui_mode: str | None,
+    ) -> dict[str, str]:
+        if not ui_mode:
+            return dict(preference_signals)
+
+        preferred_support_mode_map = {
+            "reflective": "reflect",
+            "calming": "recover",
+            "problem-solving": "reframe",
+            "planning": "plan",
+        }
+
+        updated = dict(preference_signals)
+        mapped = preferred_support_mode_map.get(ui_mode)
+        if mapped:
+            updated["preferred_support_mode"] = mapped
+        return updated
+
     async def _log_memory_trace(
         self,
         *,
@@ -168,6 +190,7 @@ class AgentRuntimeService:
                     "support_mode": result.get("support_mode"),
                     "specialist_agent": result.get("specialist_agent"),
                     "support_track": result.get("support_track"),
+                    "ui_mode": result.get("ui_mode"),
                     "risk_level": result.get("risk_level"),
                     "requires_human_review": result.get("requires_human_review"),
                     "escalation_recommended": result.get("escalation_recommended"),
@@ -278,7 +301,11 @@ class AgentRuntimeService:
             user_id = str(payload.user_id)
             user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
             if user_exists:
-                preference_signals = await self.preference_service.get_preference_signals(user_id)
+                base_preference_signals = await self.preference_service.get_preference_signals(user_id)
+                preference_signals = self._apply_ui_mode_overrides(
+                    preference_signals=base_preference_signals,
+                    ui_mode=payload.ui_mode,
+                )
 
                 recalled_memory_items = await self.memory_service.recall(
                     user_id=user_id,
@@ -310,6 +337,8 @@ class AgentRuntimeService:
                 "user_id": str(payload.user_id) if payload.user_id else "",
                 "user_input": payload.user_input,
                 "provider": payload.provider,
+                "support_track": payload.support_track,
+                "ui_mode": payload.ui_mode,
                 "execution_path": [],
                 "node_trace": [],
                 "handoff_history": [],
@@ -338,7 +367,6 @@ class AgentRuntimeService:
                 "recurring_patterns": trend_bundle.get("recurring_patterns", []),
                 "intervention_effectiveness": trend_bundle.get("intervention_effectiveness", {}),
                 "trend_visualization": trend_bundle.get("trend_visualization", {}),
-                "support_track": None,
                 "follow_up_required": False,
                 "follow_up_plan_type": None,
                 "follow_up_plan_title": None,
@@ -390,7 +418,11 @@ class AgentRuntimeService:
                 user_id=user_id,
                 learned_preferences=result.get("learned_preferences"),
             )
-            preference_signals = await self.preference_service.get_preference_signals(user_id)
+            refreshed_preference_signals = await self.preference_service.get_preference_signals(user_id)
+            preference_signals = self._apply_ui_mode_overrides(
+                preference_signals=refreshed_preference_signals,
+                ui_mode=payload.ui_mode,
+            )
 
             if bool(result.get("follow_up_required")) and not bool(result.get("safety_override", False)):
                 created_plan = await self.follow_up_service.create_plan(

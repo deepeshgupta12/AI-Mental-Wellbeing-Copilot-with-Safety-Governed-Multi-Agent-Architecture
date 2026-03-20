@@ -8,6 +8,7 @@ class AgentRuntimeState(TypedDict, total=False):
     user_input: str
     provider: str
     support_track: str | None
+    ui_mode: str | None
 
     trace_id: str
     current_node: str
