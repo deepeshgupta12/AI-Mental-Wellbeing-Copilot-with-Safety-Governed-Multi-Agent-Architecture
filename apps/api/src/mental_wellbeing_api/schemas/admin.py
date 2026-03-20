@@ -217,6 +217,21 @@ class AdminRoutingRulesResponse(BaseModel):
     live_payload: dict[str, Any]
 
 
+class AdminSafetyFlowOverviewResponse(BaseModel):
+    total_safety_events: int = 0
+    queued_safety_events: int = 0
+    in_review_safety_events: int = 0
+    resolved_safety_events: int = 0
+    high_risk_safety_events: int = 0
+    critical_safety_events: int = 0
+    alertable_trace_count: int = 0
+    immutable_audit_log_count: int = 0
+    decision_path_breakdown: dict[str, int] = Field(default_factory=dict)
+    review_priority_breakdown: dict[str, int] = Field(default_factory=dict)
+    escalation_status_breakdown: dict[str, int] = Field(default_factory=dict)
+    temporal_safety_contract_status_breakdown: dict[str, int] = Field(default_factory=dict)
+
+
 class AdminOpsOverviewResponse(BaseModel):
     total_flags: int
     unresolved_flags: int
@@ -227,6 +242,9 @@ class AdminOpsOverviewResponse(BaseModel):
     active_config_versions: int
     latest_runtime_executions: list[AdminTraceExecutionSummaryResponse] = Field(default_factory=list)
     intervention_overview: AdminInterventionOverviewResponse
+    safety_flow_overview: AdminSafetyFlowOverviewResponse = Field(
+        default_factory=AdminSafetyFlowOverviewResponse
+    )
 
 
 class AdminAnalyticsOverviewResponse(BaseModel):
@@ -235,6 +253,9 @@ class AdminAnalyticsOverviewResponse(BaseModel):
     support_strategy_breakdown: dict[str, int] = Field(default_factory=dict)
     follow_up_status_breakdown: dict[str, int] = Field(default_factory=dict)
     intervention_overview: AdminInterventionOverviewResponse
+    safety_flow_overview: AdminSafetyFlowOverviewResponse = Field(
+        default_factory=AdminSafetyFlowOverviewResponse
+    )
 
 
 class AdminSafetyEventResponse(BaseModel):

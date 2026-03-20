@@ -84,3 +84,5 @@ class AgentRuntimeState(TypedDict, total=False):
     quality_checks: dict[str, Any]
     audit_snapshot: dict[str, Any]
     review_recommended: bool
+    alertable_safety_trace: bool
+    safety_temporal_contract: dict[str, Any]
