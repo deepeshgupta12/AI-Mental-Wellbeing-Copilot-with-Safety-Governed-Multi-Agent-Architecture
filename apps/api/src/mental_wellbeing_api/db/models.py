@@ -5,6 +5,7 @@ from mental_wellbeing_api.models.agent_trace import AgentTrace
 from mental_wellbeing_api.models.auth_session import AuthSession
 from mental_wellbeing_api.models.check_in import CheckIn
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
+from mental_wellbeing_api.models.enterprise_setting import EnterpriseSetting
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.models.intervention_log import InterventionLog
@@ -31,6 +32,7 @@ __all__ = [
     "CheckIn",
     "ConversationMessage",
     "ConversationSession",
+    "EnterpriseSetting",
     "FollowUpEvent",
     "FollowUpPlan",
     "InterventionLog",

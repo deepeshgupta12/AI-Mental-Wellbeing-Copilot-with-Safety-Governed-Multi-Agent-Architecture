@@ -649,3 +649,25 @@ export type SupportTrack = {
   description: string;
   suggested_prompt: string;
 };
+
+export type EnterpriseSetting = {
+  id: string;
+  scope_type: string;
+  scope_id: string;
+  setting_key: string;
+  payload_json: Record<string, unknown>;
+  is_active: boolean;
+  created_by?: string | null;
+  updated_by?: string | null;
+  change_note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResolvedEnterpriseSettings = {
+  deployment_name: string;
+  organization_id?: string | null;
+  deployment_settings: Record<string, unknown>;
+  organization_settings?: Record<string, unknown> | null;
+  effective_settings: Record<string, unknown>;
+};

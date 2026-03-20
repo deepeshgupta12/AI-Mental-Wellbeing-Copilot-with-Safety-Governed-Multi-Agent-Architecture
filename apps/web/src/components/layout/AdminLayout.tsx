@@ -9,12 +9,13 @@ import {
   FileSearch,
   Flag,
   GitCompare,
+  History,
   LayoutDashboard,
   Route,
   Settings2,
   ShieldAlert,
+  SlidersHorizontal,
   SplitSquareVertical,
-  History,
 } from "lucide-react";
 
 const adminNav = [
@@ -28,6 +29,7 @@ const adminNav = [
   { title: "Policy History", url: "/admin/policy-history", icon: History },
   { title: "Config Audit", url: "/admin/audit", icon: GitCompare },
   { title: "Routing / Policy", url: "/admin/policy", icon: Route },
+  { title: "Enterprise Settings", url: "/admin/settings", icon: SlidersHorizontal },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
@@ -89,9 +91,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
           <h2 className="font-heading font-semibold text-foreground">
-            Admin Intelligence & Safety Operations
+            Admin Intelligence, Safety, and Enterprise Governance
           </h2>
-          <div className="text-xs text-muted-foreground">V3-Pack6</div>
+          <div className="text-xs text-muted-foreground">V4-Pack2</div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

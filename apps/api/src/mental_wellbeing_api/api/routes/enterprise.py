@@ -12,7 +12,12 @@ from mental_wellbeing_api.schemas.enterprise import (
     OrganizationMembershipResponse,
     OrganizationResponse,
 )
+from mental_wellbeing_api.schemas.governance import (
+    EnterpriseSettingResponse,
+    ResolvedEnterpriseSettingsResponse,
+)
 from mental_wellbeing_api.services.auth_service import RequestContext
+from mental_wellbeing_api.services.enterprise_settings_service import EnterpriseSettingsService
 
 router = APIRouter(
     prefix="/enterprise",
@@ -26,6 +31,28 @@ async def get_enterprise_context(
     context: RequestContext = Depends(request_context_dep),
 ) -> RequestContextResponse:
     return context.to_response()
+
+
+@router.get("/settings/resolved", response_model=ResolvedEnterpriseSettingsResponse)
+async def get_resolved_settings_for_context(
+    context: RequestContext = Depends(request_context_dep),
+    session: AsyncSession = Depends(db_session_dep),
+) -> ResolvedEnterpriseSettingsResponse:
+    service = EnterpriseSettingsService(session)
+    payload = await service.resolve_settings(organization_id=context.organization_id)
+    return ResolvedEnterpriseSettingsResponse(**payload)
+
+
+@router.get("/settings/organization/current", response_model=EnterpriseSettingResponse)
+async def get_current_organization_settings(
+    context: RequestContext = Depends(request_context_dep),
+    session: AsyncSession = Depends(db_session_dep),
+) -> EnterpriseSettingResponse:
+    if not context.organization_id:
+        raise HTTPException(status_code=404, detail="No organization in current context")
+
+    service = EnterpriseSettingsService(session)
+    return await service.get_organization_settings(context.organization_id)
 
 
 @router.get("/organizations/{organization_id}", response_model=OrganizationResponse)

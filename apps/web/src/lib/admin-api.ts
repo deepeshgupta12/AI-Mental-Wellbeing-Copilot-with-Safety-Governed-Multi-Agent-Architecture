@@ -22,6 +22,8 @@ import type {
   AdminTraceExecutionDetail,
   AdminTraceExecutionSummary,
   AdminTraceItem,
+  EnterpriseSetting,
+  ResolvedEnterpriseSettings,
 } from "@/types/api";
 
 export function getAdminFlaggedSessions(): Promise<AdminFlaggedSession[]> {
@@ -192,4 +194,46 @@ export function getAdminEscalationAnalytics(): Promise<AdminEscalationAnalytics>
 
 export function getAdminAuditTimeline(): Promise<AdminAuditLog[]> {
   return apiRequest<AdminAuditLog[]>("/api/v1/admin/audit-timeline");
+}
+
+export function getAdminDeploymentSettings(): Promise<EnterpriseSetting> {
+  return apiRequest<EnterpriseSetting>("/api/v1/admin/settings/deployment/current");
+}
+
+export function updateAdminDeploymentSettings(
+  payloadJson: Record<string, unknown>,
+  changeNote?: string | null,
+): Promise<EnterpriseSetting> {
+  return apiRequest<EnterpriseSetting>("/api/v1/admin/settings/deployment/current", {
+    method: "PUT",
+    body: JSON.stringify({
+      payload_json: payloadJson,
+      change_note: changeNote ?? null,
+    }),
+  });
+}
+
+export function getAdminOrganizationSettings(organizationId: string): Promise<EnterpriseSetting> {
+  return apiRequest<EnterpriseSetting>(`/api/v1/admin/settings/organizations/${organizationId}`);
+}
+
+export function updateAdminOrganizationSettings(
+  organizationId: string,
+  payloadJson: Record<string, unknown>,
+  changeNote?: string | null,
+): Promise<EnterpriseSetting> {
+  return apiRequest<EnterpriseSetting>(`/api/v1/admin/settings/organizations/${organizationId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      payload_json: payloadJson,
+      change_note: changeNote ?? null,
+    }),
+  });
+}
+
+export function getAdminResolvedEnterpriseSettings(
+  organizationId?: string | null,
+): Promise<ResolvedEnterpriseSettings> {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<ResolvedEnterpriseSettings>(`/api/v1/admin/settings/resolved${query}`);
 }
