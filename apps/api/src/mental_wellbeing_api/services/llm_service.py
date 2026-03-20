@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+from urllib.error import URLError
+from urllib.parse import urljoin
+from urllib.request import Request, urlopen
+
 from ollama import Client as OllamaClient
 from openai import OpenAI
 
@@ -10,6 +15,8 @@ from mental_wellbeing_api.services.agent_model_assignment_service import (
 
 
 class LLMService:
+    _ollama_model_cache: dict[tuple[str, str], bool] = {}
+
     def __init__(self) -> None:
         self.settings = get_settings()
         self.assignment_service = AgentModelAssignmentService()
@@ -86,6 +93,50 @@ class LLMService:
         )
         return (response.get("message", {}).get("content") or "").strip()
 
+    def _ollama_model_available(self, model: str | None) -> bool:
+        resolved_model = (model or "").strip()
+        if not resolved_model:
+            return False
+
+        cache_key = (self.settings.ollama_base_url.rstrip("/"), resolved_model)
+        cached = self._ollama_model_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        tags_url = urljoin(f"{self.settings.ollama_base_url.rstrip('/')}/", "api/tags")
+
+        try:
+            request = Request(tags_url, method="GET")
+            with urlopen(request, timeout=2) as response:
+                raw = response.read().decode("utf-8")
+                payload = json.loads(raw)
+        except (URLError, TimeoutError, ValueError, OSError):
+            self._ollama_model_cache[cache_key] = False
+            return False
+
+        models = payload.get("models", [])
+        available_names: set[str] = set()
+
+        if isinstance(models, list):
+            for item in models:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                model_name = str(item.get("model") or "").strip()
+                if name:
+                    available_names.add(name)
+                if model_name:
+                    available_names.add(model_name)
+
+        available = (
+            resolved_model in available_names
+            or f"{resolved_model}:latest" in available_names
+            or any(name.startswith(f"{resolved_model}:") for name in available_names)
+        )
+
+        self._ollama_model_cache[cache_key] = available
+        return available
+
     def generate_text(
         self,
         provider: str,
@@ -120,30 +171,35 @@ class LLMService:
             except Exception:
                 pass
 
-            try:
-                text = self._generate_ollama_text(
-                    model=self.settings.ollama_default_model,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                )
-                if text:
-                    return text
-            except Exception:
-                pass
+            ollama_model = self.settings.ollama_default_model
+            if self._ollama_model_available(ollama_model):
+                try:
+                    text = self._generate_ollama_text(
+                        model=ollama_model,
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                    )
+                    if text:
+                        return text
+                except Exception:
+                    pass
 
             return self._fallback_text(agent_name)
 
         if normalized_provider == "ollama":
-            try:
-                text = self._generate_ollama_text(
-                    model=assigned_model or self.settings.ollama_default_model,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                )
-                if text:
-                    return text
-            except Exception:
-                pass
+            ollama_model = assigned_model or self.settings.ollama_default_model
+
+            if self._ollama_model_available(ollama_model):
+                try:
+                    text = self._generate_ollama_text(
+                        model=ollama_model,
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                    )
+                    if text:
+                        return text
+                except Exception:
+                    pass
 
             try:
                 text = self._generate_openai_text(

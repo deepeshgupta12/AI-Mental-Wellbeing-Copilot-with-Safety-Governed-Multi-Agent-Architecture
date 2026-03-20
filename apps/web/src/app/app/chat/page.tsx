@@ -1,7 +1,15 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ElementType,
+} from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -29,11 +37,17 @@ import {
   setCurrentConversationSessionId,
 } from "@/lib/demo-session";
 import { listSupportTracks } from "@/lib/support-tracks-api";
-import type { AgentRuntimeSmokeResponse } from "@/types/api";
+import type { AgentRuntimeSmokeResponse, ConversationMessage } from "@/types/api";
 
 type LocalMode = "reflective" | "calming" | "problem-solving" | "planning";
 
-const modeLabels: { id: LocalMode; label: string; icon: React.ElementType }[] = [
+type PendingBubble = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+const modeLabels: { id: LocalMode; label: string; icon: ElementType }[] = [
   { id: "reflective", label: "Reflective", icon: Sparkles },
   { id: "calming", label: "Calming", icon: Wind },
   { id: "problem-solving", label: "Problem-solving", icon: Lightbulb },
@@ -50,6 +64,80 @@ function mapModeToUiMode(mode: LocalMode): LocalMode {
   return mode;
 }
 
+function TypingIndicator() {
+  return (
+    <div className="rounded-lg bg-muted/50 px-4 py-4">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+          A
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="sr-only">Agent is typing</span>
+            <motion.span
+              className="h-2 w-2 rounded-full bg-muted-foreground/70"
+              animate={{ opacity: [0.25, 1, 0.25], y: [0, -1, 0] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: 0 }}
+            />
+            <motion.span
+              className="h-2 w-2 rounded-full bg-muted-foreground/70"
+              animate={{ opacity: [0.25, 1, 0.25], y: [0, -1, 0] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: 0.15 }}
+            />
+            <motion.span
+              className="h-2 w-2 rounded-full bg-muted-foreground/70"
+              animate={{ opacity: [0.25, 1, 0.25], y: [0, -1, 0] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: 0.3 }}
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Agent is thinking…</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({
+  role,
+  content,
+  pending = false,
+}: {
+  role: "user" | "assistant";
+  content: string;
+  pending?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`rounded-lg px-4 py-4 ${role === "assistant" ? "bg-muted/50" : ""} ${
+        pending ? "opacity-90" : ""
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+            role === "assistant"
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-secondary-foreground"
+          }`}
+        >
+          {role === "assistant" ? "A" : "Y"}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {content}
+          </p>
+          {pending && role === "user" ? (
+            <p className="mt-2 text-xs text-muted-foreground">Sent to agent…</p>
+          ) : null}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function ChatPageContent() {
   const searchParams = useSearchParams();
 
@@ -60,6 +148,8 @@ function ChatPageContent() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [supportTrack, setSupportTrack] = useState<string | null>(null);
   const [latestRuntime, setLatestRuntime] = useState<AgentRuntimeSmokeResponse | null>(null);
+  const [pendingUserBubble, setPendingUserBubble] = useState<PendingBubble | null>(null);
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const supportTracksQuery = useQuery({
@@ -139,20 +229,36 @@ function ChatPageContent() {
 
       return runtimeResponse;
     },
-    onSuccess: async (runtimeResponse) => {
+    onMutate: async (content) => {
+      setPendingUserBubble({
+        id: `pending-user-${Date.now()}`,
+        role: "user",
+        content,
+      });
+      setShowTypingIndicator(true);
       setInput("");
+    },
+    onSuccess: async (runtimeResponse) => {
       setLatestRuntime(runtimeResponse);
+      setPendingUserBubble(null);
+      setShowTypingIndicator(false);
       await messagesQuery.refetch();
+    },
+    onError: (_error, variables) => {
+      setPendingUserBubble(null);
+      setShowTypingIndicator(false);
+      setInput(variables);
     },
   });
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesQuery.data, sendFlowMutation.isPending, latestRuntime]);
+  }, [messagesQuery.data, pendingUserBubble, showTypingIndicator, latestRuntime]);
 
   const handleSend = () => {
-    if (!input.trim() || !sessionId || !userId) return;
-    sendFlowMutation.mutate(input.trim());
+    const trimmed = input.trim();
+    if (!trimmed || !sessionId || !userId || sendFlowMutation.isPending) return;
+    sendFlowMutation.mutate(trimmed);
   };
 
   const activeMode = modeLabels.find((m) => m.id === currentMode);
@@ -165,6 +271,19 @@ function ChatPageContent() {
       latestRuntime?.requires_human_review === true
     );
   }, [latestRuntime]);
+
+  const renderedMessages: Array<
+    ConversationMessage | { id: string; role: "user" | "assistant"; content: string; pending?: boolean }
+  > = [...messages];
+
+  if (pendingUserBubble) {
+    renderedMessages.push({
+      id: pendingUserBubble.id,
+      role: pendingUserBubble.role,
+      content: pendingUserBubble.content,
+      pending: true,
+    });
+  }
 
   return (
     <>
@@ -265,36 +384,18 @@ function ChatPageContent() {
               </div>
             ) : (
               <AnimatePresence>
-                {messages.map((msg) => (
-                  <motion.div
+                {renderedMessages.map((msg) => (
+                  <ChatBubble
                     key={msg.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className={`rounded-lg px-4 py-4 ${
-                      msg.role === "assistant" ? "bg-muted/50" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                          msg.role === "assistant"
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground"
-                        }`}
-                      >
-                        {msg.role === "assistant" ? "A" : "Y"}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                          {msg.content}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
+                    role={msg.role as "user" | "assistant"}
+                    content={msg.content}
+                    pending={"pending" in msg ? Boolean(msg.pending) : false}
+                  />
                 ))}
               </AnimatePresence>
             )}
+
+            {showTypingIndicator ? <TypingIndicator /> : null}
 
             {latestRuntime?.human_summary && latestRuntime.requires_human_review && (
               <div className="mt-3 rounded-lg border border-urgent/20 bg-card p-4 shadow-card">
@@ -317,7 +418,7 @@ function ChatPageContent() {
           </div>
         </div>
 
-        {messages.length <= 2 && (
+        {messages.length <= 2 && !pendingUserBubble && !showTypingIndicator && (
           <div className="mx-auto flex w-full max-w-2xl gap-2 overflow-x-auto px-4 pb-2 md:px-6">
             {suggestedPrompts.map((prompt) => (
               <button
@@ -345,7 +446,7 @@ function ChatPageContent() {
               placeholder="What's on your mind?"
               rows={1}
               className="min-h-[42px] max-h-[160px] flex-1 resize-none rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              style={{ fieldSizing: "content" } as React.CSSProperties}
+              style={{ fieldSizing: "content" } as CSSProperties}
             />
             <Button
               onClick={handleSend}

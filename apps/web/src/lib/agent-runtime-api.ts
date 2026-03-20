@@ -11,6 +11,7 @@ export function runAgentRuntimeSmoke(
   return apiRequest<AgentRuntimeSmokeResponse>("/api/v1/agent-runtime/smoke", {
     method: "POST",
     body: JSON.stringify(payload),
+    timeoutMs: 45000,
   });
 }
 
@@ -22,6 +23,7 @@ export function evaluateSafety(
     {
       method: "POST",
       body: JSON.stringify(payload),
+      timeoutMs: 20000,
     },
   );
 }
