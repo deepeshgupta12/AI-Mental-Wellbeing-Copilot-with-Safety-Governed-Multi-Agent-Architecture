@@ -35,15 +35,12 @@ class Settings(BaseSettings):
     ollama_default_model: str = Field(default="llama3.2", alias="OLLAMA_DEFAULT_MODEL")
 
     scheduler_backend: str = Field(default="local_contract", alias="SCHEDULER_BACKEND")
-
     temporal_enabled: bool = Field(default=False, alias="TEMPORAL_ENABLED")
-    temporal_host: str = Field(default="localhost:7233", alias="TEMPORAL_HOST")
     temporal_namespace: str = Field(default="default", alias="TEMPORAL_NAMESPACE")
     temporal_task_queue: str = Field(
         default="mental-wellbeing-followups",
         alias="TEMPORAL_TASK_QUEUE",
     )
-    temporal_enable_worker: bool = Field(default=False, alias="TEMPORAL_ENABLE_WORKER")
 
     cors_allow_origins: str = Field(
         default=(
@@ -59,6 +56,37 @@ class Settings(BaseSettings):
     otel_service_name: str = Field(
         default="mental-wellbeing-api",
         alias="OTEL_SERVICE_NAME",
+    )
+
+    # -----------------------------
+    # V4 Pack 1 enterprise auth/RBAC
+    # -----------------------------
+    deployment_name: str = Field(default="local", alias="DEPLOYMENT_NAME")
+    auth_mode: str = Field(default="development_bypass", alias="AUTH_MODE")
+    auth_session_secret: str = Field(
+        default="dev-session-secret-change-me",
+        alias="AUTH_SESSION_SECRET",
+    )
+    auth_access_token_ttl_minutes: int = Field(
+        default=480,
+        alias="AUTH_ACCESS_TOKEN_TTL_MINUTES",
+    )
+    auth_header_name: str = Field(default="Authorization", alias="AUTH_HEADER_NAME")
+    auth_cookie_name: str = Field(default="mwc_session", alias="AUTH_COOKIE_NAME")
+    auth_allow_dev_bootstrap: bool = Field(default=True, alias="AUTH_ALLOW_DEV_BOOTSTRAP")
+    auth_allow_dev_headers: bool = Field(default=True, alias="AUTH_ALLOW_DEV_HEADERS")
+
+    enterprise_default_org_name: str = Field(
+        default="Default Enterprise",
+        alias="ENTERPRISE_DEFAULT_ORG_NAME",
+    )
+    enterprise_default_org_slug: str = Field(
+        default="default-enterprise",
+        alias="ENTERPRISE_DEFAULT_ORG_SLUG",
+    )
+    enterprise_admin_role_name: str = Field(
+        default="platform_admin",
+        alias="ENTERPRISE_ADMIN_ROLE_NAME",
     )
 
     @property
@@ -79,6 +107,14 @@ class Settings(BaseSettings):
             for origin in self.cors_allow_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def is_production_like(self) -> bool:
+        return self.app_env.lower() in {"production", "prod", "staging"}
+
+    @property
+    def auth_requires_token(self) -> bool:
+        return self.auth_mode == "token_required"
 
 
 @lru_cache
