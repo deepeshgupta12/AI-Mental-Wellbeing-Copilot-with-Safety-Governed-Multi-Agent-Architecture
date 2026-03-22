@@ -10,6 +10,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { setPendingAuthIdentity } from "@/lib/demo-session";
 
 function AuthPageInner() {
   const searchParams = useSearchParams();
@@ -23,6 +24,15 @@ function AuthPageInner() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const normalizedEmail = email.trim().toLowerCase() || "demo-member@example.com";
+    const displayName = normalizedEmail.split("@")[0] || "Aether Demo Member";
+
+    setPendingAuthIdentity({
+      email: normalizedEmail,
+      displayName,
+    });
+
     router.push(mode === "signup" ? "/onboarding" : "/app");
   };
 
