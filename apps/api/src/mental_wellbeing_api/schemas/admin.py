@@ -366,6 +366,7 @@ class AdminAuditLogResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+
 class AdminOrganizationSummaryResponse(BaseModel):
     id: str
     name: str
@@ -380,7 +381,89 @@ class AdminOrganizationSummaryResponse(BaseModel):
     updated_at: datetime
 
 
+class AdminOrganizationMemberSummaryResponse(BaseModel):
+    membership_id: str
+    user_id: str
+    email: str | None = None
+    display_name: str | None = None
+    role_name: str | None = None
+    status: str
+    is_default: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminOperationalKpiResponse(BaseModel):
+    window_days: int
+    member_count: int = 0
+    active_session_count: int = 0
+    session_count_window: int = 0
+    safety_event_count_window: int = 0
+    high_risk_safety_event_count_window: int = 0
+    intervention_count_window: int = 0
+    follow_up_plan_count_window: int = 0
+    follow_up_event_count_window: int = 0
+    review_completion_rate_pct: float = 0.0
+    avg_queue_age_hours: float = 0.0
+    reviewer_count: int = 0
+
+
+class AdminSafetyRollupResponse(BaseModel):
+    total_events: int = 0
+    window_days: int = 30
+    high_risk_events: int = 0
+    critical_events: int = 0
+    queue_status_breakdown: dict[str, int] = Field(default_factory=dict)
+    risk_level_breakdown: dict[str, int] = Field(default_factory=dict)
+    escalation_status_breakdown: dict[str, int] = Field(default_factory=dict)
+    review_completion_rate_pct: float = 0.0
+    avg_queue_age_hours: float = 0.0
+
+
+class AdminInterventionRollupResponse(BaseModel):
+    total_logs: int = 0
+    window_days: int = 30
+    avg_effectiveness_rating: float | None = None
+    intervention_type_breakdown: dict[str, int] = Field(default_factory=dict)
+    outcome_status_breakdown: dict[str, int] = Field(default_factory=dict)
+
+
+class AdminReviewerProductivityItemResponse(BaseModel):
+    reviewer_id: str
+    review_count: int = 0
+    resolved_count: int = 0
+    escalated_count: int = 0
+    completion_rate_pct: float = 0.0
+    avg_review_lag_hours: float | None = None
+    avg_resolution_hours: float | None = None
+    latest_reviewed_at: datetime | None = None
+
+
+class AdminActivityTrendPointResponse(BaseModel):
+    date: str
+    safety_events: int = 0
+    interventions: int = 0
+    follow_up_events: int = 0
+
+
+class AdminArtifactDrilldownItemResponse(BaseModel):
+    id: str
+    scope_type: str
+    scope_id: str
+    artifact_kind: str
+    file_name: str
+    storage_provider: str
+    storage_uri: str
+    local_path: str | None = None
+    byte_size: int
+    checksum_sha256: str | None = None
+    content_type: str | None = None
+    created_at: datetime
+
+
 class AdminEnterpriseAnalyticsOverviewResponse(BaseModel):
+    scope_organization_id: str | None = None
+    window_days: int = 30
     total_organizations: int
     active_organizations: int
     total_memberships: int
@@ -397,16 +480,35 @@ class AdminEnterpriseAnalyticsOverviewResponse(BaseModel):
     total_safety_events: int
     high_risk_safety_events: int
     organizations: list[AdminOrganizationSummaryResponse] = Field(default_factory=list)
+    scoped_organization: AdminOrganizationSummaryResponse | None = None
+    scoped_operational_kpis: AdminOperationalKpiResponse | None = None
+    scoped_safety_rollup: AdminSafetyRollupResponse | None = None
+    scoped_intervention_rollup: AdminInterventionRollupResponse | None = None
+    scoped_reviewer_productivity: list[AdminReviewerProductivityItemResponse] = Field(default_factory=list)
+    scoped_activity_trends: list[AdminActivityTrendPointResponse] = Field(default_factory=list)
 
 
 class AdminEnterpriseOrganizationDetailResponse(BaseModel):
     organization: AdminOrganizationSummaryResponse
+    window_days: int = 30
     membership_breakdown_by_role: dict[str, int] = Field(default_factory=dict)
+    member_summaries: list[AdminOrganizationMemberSummaryResponse] = Field(default_factory=list)
     recent_auth_sessions: list[dict[str, Any]] = Field(default_factory=list)
+    safety_rollup: AdminSafetyRollupResponse = Field(default_factory=AdminSafetyRollupResponse)
+    intervention_rollup: AdminInterventionRollupResponse = Field(default_factory=AdminInterventionRollupResponse)
+    reviewer_productivity: list[AdminReviewerProductivityItemResponse] = Field(default_factory=list)
+    operational_kpis: AdminOperationalKpiResponse = Field(default_factory=lambda: AdminOperationalKpiResponse(window_days=30))
+    activity_trends: list[AdminActivityTrendPointResponse] = Field(default_factory=list)
     organization_settings: dict[str, Any] = Field(default_factory=dict)
     effective_settings: dict[str, Any] = Field(default_factory=dict)
     infrastructure_summary: dict[str, Any] = Field(default_factory=dict)
-    recent_artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    recent_artifacts: list[AdminArtifactDrilldownItemResponse] = Field(default_factory=list)
+
+
+class AdminReviewerProductivityOverviewResponse(BaseModel):
+    organization_id: str | None = None
+    window_days: int = 30
+    reviewers: list[AdminReviewerProductivityItemResponse] = Field(default_factory=list)
 
 
 class AdminIntegrationEndpointResponse(BaseModel):
@@ -414,6 +516,39 @@ class AdminIntegrationEndpointResponse(BaseModel):
     path: str
     method: str
     category: str
+
+
+class AdminIntegrationConfigFieldResponse(BaseModel):
+    key: str
+    label: str
+    required: bool = False
+    secret: bool = False
+    placeholder: str | None = None
+
+
+class AdminIntegrationHealthResponse(BaseModel):
+    status: str
+    sync_enabled: bool = False
+    last_sync_at: datetime | None = None
+    last_error: str | None = None
+
+
+class AdminIntegrationAuditHookResponse(BaseModel):
+    action: str
+    event_type: str
+    enabled: bool = True
+
+
+class AdminIntegrationRegistryItemResponse(BaseModel):
+    integration_key: str
+    display_name: str
+    category: str
+    status: str
+    adapter_type: str
+    description: str
+    config_placeholders: list[AdminIntegrationConfigFieldResponse] = Field(default_factory=list)
+    health: AdminIntegrationHealthResponse
+    audit_hooks: list[AdminIntegrationAuditHookResponse] = Field(default_factory=list)
 
 
 class AdminIntegrationOverviewResponse(BaseModel):
@@ -426,9 +561,8 @@ class AdminIntegrationOverviewResponse(BaseModel):
     temporal_enabled: bool
     model_provider_policy: dict[str, Any] = Field(default_factory=dict)
     feature_flags: dict[str, Any] = Field(default_factory=dict)
-    integration_endpoints: list[AdminIntegrationEndpointResponse] = Field(
-        default_factory=list
-    )
+    integration_endpoints: list[AdminIntegrationEndpointResponse] = Field(default_factory=list)
+    integration_registry: list[AdminIntegrationRegistryItemResponse] = Field(default_factory=list)
     artifact_exports_enabled: bool = True
     audit_exports_enabled: bool = True
     safety_queue_enabled: bool = True
@@ -441,6 +575,16 @@ class AdminIntegrationRuntimeFeedResponse(BaseModel):
     organization_id: str | None = None
     capabilities: dict[str, bool] = Field(default_factory=dict)
     counts: dict[str, int] = Field(default_factory=dict)
+    artifact_counts_by_scope: dict[str, int] = Field(default_factory=dict)
     model_routing: dict[str, Any] = Field(default_factory=dict)
     endpoints: list[AdminIntegrationEndpointResponse] = Field(default_factory=list)
+    integration_registry: list[AdminIntegrationRegistryItemResponse] = Field(default_factory=list)
+    recent_artifacts: list[AdminArtifactDrilldownItemResponse] = Field(default_factory=list)
+    redacted: bool = True
+
+
+class AdminIntegrationArtifactDrilldownResponse(BaseModel):
+    deployment_name: str
+    organization_id: str | None = None
+    artifacts: list[AdminArtifactDrilldownItemResponse] = Field(default_factory=list)
     redacted: bool = True

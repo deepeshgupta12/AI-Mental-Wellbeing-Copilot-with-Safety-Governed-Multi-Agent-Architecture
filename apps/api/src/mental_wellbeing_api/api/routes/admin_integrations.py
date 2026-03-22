@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep, require_permission
 from mental_wellbeing_api.schemas.admin import (
+    AdminIntegrationArtifactDrilldownResponse,
     AdminIntegrationOverviewResponse,
     AdminIntegrationRuntimeFeedResponse,
 )
@@ -37,3 +38,17 @@ async def get_integration_runtime_feed(
     service = IntegrationRegistryService(session)
     payload = await service.build_runtime_feed(organization_id=organization_id)
     return AdminIntegrationRuntimeFeedResponse(**payload)
+
+
+@router.get("/artifacts", response_model=AdminIntegrationArtifactDrilldownResponse)
+async def get_integration_artifact_drilldown(
+    organization_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminIntegrationArtifactDrilldownResponse:
+    service = IntegrationRegistryService(session)
+    payload = await service.list_artifact_drilldown(
+        organization_id=organization_id,
+        limit=limit,
+    )
+    return AdminIntegrationArtifactDrilldownResponse(**payload)

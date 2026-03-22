@@ -686,7 +686,89 @@ export type AdminOrganizationSummary = {
   updated_at: string;
 };
 
+export type AdminOrganizationMemberSummary = {
+  membership_id: string;
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  role_name: string | null;
+  status: string;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminOperationalKpi = {
+  window_days: number;
+  member_count: number;
+  active_session_count: number;
+  session_count_window: number;
+  safety_event_count_window: number;
+  high_risk_safety_event_count_window: number;
+  intervention_count_window: number;
+  follow_up_plan_count_window: number;
+  follow_up_event_count_window: number;
+  review_completion_rate_pct: number;
+  avg_queue_age_hours: number;
+  reviewer_count: number;
+};
+
+export type AdminSafetyRollup = {
+  total_events: number;
+  window_days: number;
+  high_risk_events: number;
+  critical_events: number;
+  queue_status_breakdown: Record<string, number>;
+  risk_level_breakdown: Record<string, number>;
+  escalation_status_breakdown: Record<string, number>;
+  review_completion_rate_pct: number;
+  avg_queue_age_hours: number;
+};
+
+export type AdminInterventionRollup = {
+  total_logs: number;
+  window_days: number;
+  avg_effectiveness_rating: number | null;
+  intervention_type_breakdown: Record<string, number>;
+  outcome_status_breakdown: Record<string, number>;
+};
+
+export type AdminReviewerProductivityItem = {
+  reviewer_id: string;
+  review_count: number;
+  resolved_count: number;
+  escalated_count: number;
+  completion_rate_pct: number;
+  avg_review_lag_hours: number | null;
+  avg_resolution_hours: number | null;
+  latest_reviewed_at: string | null;
+};
+
+export type AdminActivityTrendPoint = {
+  date: string;
+  safety_events: number;
+  interventions: number;
+  follow_up_events: number;
+};
+
+export type AdminArtifactDrilldownItem = {
+  id: string;
+  scope_type: string;
+  scope_id: string;
+  artifact_kind: string;
+  file_name: string;
+  storage_provider: string;
+  storage_uri: string;
+  local_path: string | null;
+  byte_size: number;
+  checksum_sha256?: string | null;
+  content_type?: string | null;
+  created_at: string;
+};
+
 export type AdminEnterpriseAnalyticsOverview = {
+  scope_organization_id?: string | null;
+  window_days: number;
   total_organizations: number;
   active_organizations: number;
   total_memberships: number;
@@ -703,16 +785,35 @@ export type AdminEnterpriseAnalyticsOverview = {
   total_safety_events: number;
   high_risk_safety_events: number;
   organizations: AdminOrganizationSummary[];
+  scoped_organization?: AdminOrganizationSummary | null;
+  scoped_operational_kpis?: AdminOperationalKpi | null;
+  scoped_safety_rollup?: AdminSafetyRollup | null;
+  scoped_intervention_rollup?: AdminInterventionRollup | null;
+  scoped_reviewer_productivity: AdminReviewerProductivityItem[];
+  scoped_activity_trends: AdminActivityTrendPoint[];
 };
 
 export type AdminEnterpriseOrganizationDetail = {
   organization: AdminOrganizationSummary;
+  window_days: number;
   membership_breakdown_by_role: Record<string, number>;
+  member_summaries: AdminOrganizationMemberSummary[];
   recent_auth_sessions: Array<Record<string, unknown>>;
+  safety_rollup: AdminSafetyRollup;
+  intervention_rollup: AdminInterventionRollup;
+  reviewer_productivity: AdminReviewerProductivityItem[];
+  operational_kpis: AdminOperationalKpi;
+  activity_trends: AdminActivityTrendPoint[];
   organization_settings: Record<string, unknown>;
   effective_settings: Record<string, unknown>;
   infrastructure_summary: Record<string, unknown>;
-  recent_artifacts: Array<Record<string, unknown>>;
+  recent_artifacts: AdminArtifactDrilldownItem[];
+};
+
+export type AdminReviewerProductivityOverview = {
+  organization_id?: string | null;
+  window_days: number;
+  reviewers: AdminReviewerProductivityItem[];
 };
 
 export type AdminIntegrationEndpoint = {
@@ -720,6 +821,39 @@ export type AdminIntegrationEndpoint = {
   path: string;
   method: string;
   category: string;
+};
+
+export type AdminIntegrationConfigField = {
+  key: string;
+  label: string;
+  required: boolean;
+  secret: boolean;
+  placeholder?: string | null;
+};
+
+export type AdminIntegrationHealth = {
+  status: string;
+  sync_enabled: boolean;
+  last_sync_at?: string | null;
+  last_error?: string | null;
+};
+
+export type AdminIntegrationAuditHook = {
+  action: string;
+  event_type: string;
+  enabled: boolean;
+};
+
+export type AdminIntegrationRegistryItem = {
+  integration_key: string;
+  display_name: string;
+  category: string;
+  status: string;
+  adapter_type: string;
+  description: string;
+  config_placeholders: AdminIntegrationConfigField[];
+  health: AdminIntegrationHealth;
+  audit_hooks: AdminIntegrationAuditHook[];
 };
 
 export type AdminIntegrationOverview = {
@@ -733,6 +867,7 @@ export type AdminIntegrationOverview = {
   model_provider_policy: Record<string, unknown>;
   feature_flags: Record<string, unknown>;
   integration_endpoints: AdminIntegrationEndpoint[];
+  integration_registry: AdminIntegrationRegistryItem[];
   artifact_exports_enabled: boolean;
   audit_exports_enabled: boolean;
   safety_queue_enabled: boolean;
@@ -745,7 +880,17 @@ export type AdminIntegrationRuntimeFeed = {
   organization_id?: string | null;
   capabilities: Record<string, boolean>;
   counts: Record<string, number>;
+  artifact_counts_by_scope: Record<string, number>;
   model_routing: Record<string, unknown>;
   endpoints: AdminIntegrationEndpoint[];
+  integration_registry: AdminIntegrationRegistryItem[];
+  recent_artifacts: AdminArtifactDrilldownItem[];
+  redacted: boolean;
+};
+
+export type AdminIntegrationArtifactDrilldown = {
+  deployment_name: string;
+  organization_id?: string | null;
+  artifacts: AdminArtifactDrilldownItem[];
   redacted: boolean;
 };
