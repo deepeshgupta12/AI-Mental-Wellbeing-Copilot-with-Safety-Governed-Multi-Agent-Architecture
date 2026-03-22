@@ -9,10 +9,13 @@ import type {
   AdminEnterpriseAnalyticsOverview,
   AdminEnterpriseOrganizationDetail,
   AdminEscalationAnalytics,
+  AdminIntegrationArtifactDrilldown,
   AdminFlaggedSession,
   AdminFlaggedSessionDetail,
   AdminIntegrationOverview,
   AdminIntegrationRuntimeFeed,
+  AdminOrganizationSummary,
+  AdminReviewerProductivityOverview,
   AdminInterventionLog,
   AdminInterventionOverview,
   AdminOpsOverview,
@@ -334,21 +337,38 @@ export function getAdminStoredArtifacts(params?: {
   return apiRequest<StoredArtifact[]>(`/api/v1/admin/settings/infrastructure/artifacts${suffix}`);
 }
 
-export function getAdminEnterpriseAnalyticsOverview(): Promise<AdminEnterpriseAnalyticsOverview> {
+export function getAdminEnterpriseAnalyticsOverview(
+  organizationId?: string | null,
+  days = 30,
+): Promise<AdminEnterpriseAnalyticsOverview> {
+  const search = new URLSearchParams();
+  if (organizationId) search.set("organization_id", organizationId);
+  search.set("days", String(days));
   return apiRequest<AdminEnterpriseAnalyticsOverview>(
-    "/api/v1/admin/enterprise-analytics/overview",
+    `/api/v1/admin/enterprise-analytics/overview?${search.toString()}`,
   );
 }
 
-export function getAdminEnterpriseOrganizations() {
-  return apiRequest("/api/v1/admin/enterprise-analytics/organizations");
+export function getAdminEnterpriseOrganizations(): Promise<AdminOrganizationSummary[]> {
+  return apiRequest<AdminOrganizationSummary[]>("/api/v1/admin/enterprise-analytics/organizations");
 }
 
 export function getAdminEnterpriseOrganizationDetail(
   organizationId: string,
+  days = 30,
 ): Promise<AdminEnterpriseOrganizationDetail> {
   return apiRequest<AdminEnterpriseOrganizationDetail>(
-    `/api/v1/admin/enterprise-analytics/organizations/${organizationId}`,
+    `/api/v1/admin/enterprise-analytics/organizations/${organizationId}?days=${days}`,
+  );
+}
+
+export function getAdminReviewerProductivityOverview(
+  organizationId: string,
+  days = 30,
+): Promise<AdminReviewerProductivityOverview> {
+  const search = new URLSearchParams({ organization_id: organizationId, days: String(days) });
+  return apiRequest<AdminReviewerProductivityOverview>(
+    `/api/v1/admin/enterprise-analytics/reviewer-productivity?${search.toString()}`,
   );
 }
 
@@ -364,4 +384,17 @@ export function getAdminIntegrationRuntimeFeed(
 ): Promise<AdminIntegrationRuntimeFeed> {
   const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
   return apiRequest<AdminIntegrationRuntimeFeed>(`/api/v1/admin/integrations/runtime-feed${query}`);
+}
+
+export function getAdminIntegrationArtifactDrilldown(params?: {
+  organizationId?: string | null;
+  limit?: number;
+}): Promise<AdminIntegrationArtifactDrilldown> {
+  const search = new URLSearchParams();
+  if (params?.organizationId) search.set("organization_id", params.organizationId);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiRequest<AdminIntegrationArtifactDrilldown>(
+    `/api/v1/admin/integrations/artifacts${suffix}`,
+  );
 }
