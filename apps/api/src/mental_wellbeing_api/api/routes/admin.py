@@ -6,14 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mental_wellbeing_api.api.deps import db_session_dep
-from mental_wellbeing_api.models.audit_log import AuditLog
+from mental_wellbeing_api.api.deps import db_session_dep, require_permission
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
-from mental_wellbeing_api.models.safety_event import SafetyEvent
 from mental_wellbeing_api.models.safety_flag import SafetyFlag
-from mental_wellbeing_api.models.safety_review import SafetyReview
 from mental_wellbeing_api.prompts.registry import (
     load_prompt_registry_document,
     load_routing_rules,
@@ -54,7 +51,11 @@ from mental_wellbeing_api.services.config_registry_service import ConfigRegistry
 from mental_wellbeing_api.services.safety_review_service import SafetyReviewService
 from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_permission("admin:read"))],
+)
 
 
 @router.get("/flagged-sessions", response_model=list[AdminFlaggedSessionResponse])
@@ -514,7 +515,11 @@ async def get_routing_rules(
     )
 
 
-@router.put("/routing-rules", response_model=AdminConfigVersionResponse)
+@router.put(
+    "/routing-rules",
+    response_model=AdminConfigVersionResponse,
+    dependencies=[Depends(require_permission("admin:write"))],
+)
 async def update_routing_rules(
     payload: AdminConfigUpdateRequest,
     session: AsyncSession = Depends(db_session_dep),
@@ -545,7 +550,11 @@ async def get_runtime_policy_versions(
     return await registry.list_versions("runtime_policy", limit=limit)
 
 
-@router.put("/runtime-policy", response_model=AdminConfigVersionResponse)
+@router.put(
+    "/runtime-policy",
+    response_model=AdminConfigVersionResponse,
+    dependencies=[Depends(require_permission("admin:write"))],
+)
 async def update_runtime_policy(
     payload: AdminConfigUpdateRequest,
     session: AsyncSession = Depends(db_session_dep),
@@ -576,7 +585,11 @@ async def get_prompt_registry_versions(
     return await registry.list_versions("prompt_registry", limit=limit)
 
 
-@router.put("/prompt-registry", response_model=AdminConfigVersionResponse)
+@router.put(
+    "/prompt-registry",
+    response_model=AdminConfigVersionResponse,
+    dependencies=[Depends(require_permission("admin:write"))],
+)
 async def update_prompt_registry(
     payload: AdminConfigUpdateRequest,
     session: AsyncSession = Depends(db_session_dep),
@@ -671,7 +684,10 @@ async def get_safety_event_detail(
     return AdminSafetyEventDetailResponse(event=event, reviews=reviews)
 
 
-@router.get("/safety-events/{safety_event_id}/reviews", response_model=list[AdminSafetyReviewResponse])
+@router.get(
+    "/safety-events/{safety_event_id}/reviews",
+    response_model=list[AdminSafetyReviewResponse],
+)
 async def get_safety_event_reviews(
     safety_event_id: str,
     session: AsyncSession = Depends(db_session_dep),
@@ -683,7 +699,11 @@ async def get_safety_event_reviews(
     return await service.list_reviews_for_event(safety_event_id=safety_event_id)
 
 
-@router.post("/safety-events/{safety_event_id}/reviews", response_model=AdminSafetyReviewResponse)
+@router.post(
+    "/safety-events/{safety_event_id}/reviews",
+    response_model=AdminSafetyReviewResponse,
+    dependencies=[Depends(require_permission("admin:write"))],
+)
 async def create_safety_event_review(
     safety_event_id: str,
     payload: AdminSafetyReviewCreateRequest,

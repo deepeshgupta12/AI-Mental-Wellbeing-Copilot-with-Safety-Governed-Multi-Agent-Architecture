@@ -649,3 +649,103 @@ export type SupportTrack = {
   description: string;
   suggested_prompt: string;
 };
+
+export type EnterpriseSetting = {
+  id: string;
+  scope_type: string;
+  scope_id: string;
+  setting_key: string;
+  payload_json: Record<string, unknown>;
+  is_active: boolean;
+  created_by?: string | null;
+  updated_by?: string | null;
+  change_note?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResolvedEnterpriseSettings = {
+  deployment_name: string;
+  organization_id?: string | null;
+  deployment_settings: Record<string, unknown>;
+  organization_settings?: Record<string, unknown> | null;
+  effective_settings: Record<string, unknown>;
+};
+
+export type AdminOrganizationSummary = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  is_active: boolean;
+  membership_count: number;
+  active_session_count: number;
+  latest_session_at: string | null;
+  latest_setting_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminEnterpriseAnalyticsOverview = {
+  total_organizations: number;
+  active_organizations: number;
+  total_memberships: number;
+  membership_breakdown_by_role: Record<string, number>;
+  total_auth_sessions: number;
+  active_auth_sessions: number;
+  expired_auth_sessions: number;
+  revoked_auth_sessions: number;
+  organization_settings_count: number;
+  deployment_settings_count: number;
+  stored_artifact_count: number;
+  artifact_breakdown_by_provider: Record<string, number>;
+  immutable_audit_log_count: number;
+  total_safety_events: number;
+  high_risk_safety_events: number;
+  organizations: AdminOrganizationSummary[];
+};
+
+export type AdminEnterpriseOrganizationDetail = {
+  organization: AdminOrganizationSummary;
+  membership_breakdown_by_role: Record<string, number>;
+  recent_auth_sessions: Array<Record<string, unknown>>;
+  organization_settings: Record<string, unknown>;
+  effective_settings: Record<string, unknown>;
+  infrastructure_summary: Record<string, unknown>;
+  recent_artifacts: Array<Record<string, unknown>>;
+};
+
+export type AdminIntegrationEndpoint = {
+  name: string;
+  path: string;
+  method: string;
+  category: string;
+};
+
+export type AdminIntegrationOverview = {
+  deployment_name: string;
+  organization_id?: string | null;
+  auth_mode?: string | null;
+  storage_provider: string;
+  secret_backend: string;
+  scheduler_backend: string;
+  temporal_enabled: boolean;
+  model_provider_policy: Record<string, unknown>;
+  feature_flags: Record<string, unknown>;
+  integration_endpoints: AdminIntegrationEndpoint[];
+  artifact_exports_enabled: boolean;
+  audit_exports_enabled: boolean;
+  safety_queue_enabled: boolean;
+  redacted: boolean;
+};
+
+export type AdminIntegrationRuntimeFeed = {
+  generated_at: string;
+  deployment_name: string;
+  organization_id?: string | null;
+  capabilities: Record<string, boolean>;
+  counts: Record<string, number>;
+  model_routing: Record<string, unknown>;
+  endpoints: AdminIntegrationEndpoint[];
+  redacted: boolean;
+};
