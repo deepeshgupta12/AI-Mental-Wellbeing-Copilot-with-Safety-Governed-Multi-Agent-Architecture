@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -62,7 +62,7 @@ class BaseExternalProviderAdapter:
             "sync_supported": self.sync_supported,
             "manual_ingest_supported": self.manual_ingest_supported,
             "consent_required": self.consent_required,
-            "config_fields": [field.__dict__ for field in self.config_fields()],
+            "config_fields": [asdict(field_item) for field_item in self.config_fields()],
         }
 
     def normalize_payload(self, payload_json: dict[str, Any]) -> list[NormalizedSignalInput]:
@@ -74,7 +74,10 @@ class GoogleCalendarAdapter(BaseExternalProviderAdapter):
     provider_key = "google_calendar"
     display_name = "Google Calendar"
     category = "calendar"
-    description = "Manual or scheduled ingestion contract for calendar events such as meetings, therapy sessions, routines, or focus blocks."
+    description = (
+        "Manual or scheduled ingestion contract for calendar events such as meetings, "
+        "therapy sessions, routines, or focus blocks."
+    )
 
     def config_fields(self) -> list[CatalogField]:
         return [
@@ -116,7 +119,10 @@ class AppleRemindersAdapter(BaseExternalProviderAdapter):
     provider_key = "apple_reminders"
     display_name = "Apple Reminders"
     category = "reminders"
-    description = "Manual or scheduled ingestion contract for reminders, tasks, coping prompts, and recurring nudges."
+    description = (
+        "Manual or scheduled ingestion contract for reminders, tasks, coping prompts, "
+        "and recurring nudges."
+    )
 
     def config_fields(self) -> list[CatalogField]:
         return [
@@ -158,12 +164,20 @@ class FitbitWearableAdapter(BaseExternalProviderAdapter):
     provider_key = "fitbit_wearable"
     display_name = "Fitbit Wearable"
     category = "wearable"
-    description = "Manual or scheduled ingestion contract for wearable signals such as steps, heart rate, stress, readiness, and activity samples."
+    description = (
+        "Manual or scheduled ingestion contract for wearable signals such as steps, "
+        "heart rate, stress, readiness, and activity samples."
+    )
 
     def config_fields(self) -> list[CatalogField]:
         return [
             CatalogField("device_label", "Device Label", required=False, placeholder="Fitbit Charge"),
-            CatalogField("metric_mode", "Metric Mode", required=False, placeholder="steps / heart_rate / stress"),
+            CatalogField(
+                "metric_mode",
+                "Metric Mode",
+                required=False,
+                placeholder="steps / heart_rate / stress",
+            ),
         ]
 
     def normalize_payload(self, payload_json: dict[str, Any]) -> list[NormalizedSignalInput]:
@@ -203,12 +217,20 @@ class OuraSleepAdapter(BaseExternalProviderAdapter):
     provider_key = "oura_sleep"
     display_name = "Oura Sleep"
     category = "sleep"
-    description = "Manual or scheduled ingestion contract for sleep sessions, duration, quality, and sleep score normalization."
+    description = (
+        "Manual or scheduled ingestion contract for sleep sessions, duration, quality, "
+        "and sleep score normalization."
+    )
 
     def config_fields(self) -> list[CatalogField]:
         return [
             CatalogField("device_label", "Device Label", required=False, placeholder="Oura Ring"),
-            CatalogField("account_label", "Account Label", required=False, placeholder="Primary Sleep Source"),
+            CatalogField(
+                "account_label",
+                "Account Label",
+                required=False,
+                placeholder="Primary Sleep Source",
+            ),
         ]
 
     def normalize_payload(self, payload_json: dict[str, Any]) -> list[NormalizedSignalInput]:
