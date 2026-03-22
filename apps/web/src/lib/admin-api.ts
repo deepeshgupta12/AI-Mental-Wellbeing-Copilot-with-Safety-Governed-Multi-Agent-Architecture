@@ -6,9 +6,13 @@ import type {
   AdminConfigAudit,
   AdminConfigDiff,
   AdminConfigVersion,
+  AdminEnterpriseAnalyticsOverview,
+  AdminEnterpriseOrganizationDetail,
   AdminEscalationAnalytics,
   AdminFlaggedSession,
   AdminFlaggedSessionDetail,
+  AdminIntegrationOverview,
+  AdminIntegrationRuntimeFeed,
   AdminInterventionLog,
   AdminInterventionOverview,
   AdminOpsOverview,
@@ -328,4 +332,36 @@ export function getAdminStoredArtifacts(params?: {
 
   const suffix = search.toString() ? `?${search.toString()}` : "";
   return apiRequest<StoredArtifact[]>(`/api/v1/admin/settings/infrastructure/artifacts${suffix}`);
+}
+
+export function getAdminEnterpriseAnalyticsOverview(): Promise<AdminEnterpriseAnalyticsOverview> {
+  return apiRequest<AdminEnterpriseAnalyticsOverview>(
+    "/api/v1/admin/enterprise-analytics/overview",
+  );
+}
+
+export function getAdminEnterpriseOrganizations() {
+  return apiRequest("/api/v1/admin/enterprise-analytics/organizations");
+}
+
+export function getAdminEnterpriseOrganizationDetail(
+  organizationId: string,
+): Promise<AdminEnterpriseOrganizationDetail> {
+  return apiRequest<AdminEnterpriseOrganizationDetail>(
+    `/api/v1/admin/enterprise-analytics/organizations/${organizationId}`,
+  );
+}
+
+export function getAdminIntegrationOverview(
+  organizationId?: string | null,
+): Promise<AdminIntegrationOverview> {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<AdminIntegrationOverview>(`/api/v1/admin/integrations/overview${query}`);
+}
+
+export function getAdminIntegrationRuntimeFeed(
+  organizationId?: string | null,
+): Promise<AdminIntegrationRuntimeFeed> {
+  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<AdminIntegrationRuntimeFeed>(`/api/v1/admin/integrations/runtime-feed${query}`);
 }

@@ -240,7 +240,9 @@ class AdminOpsOverviewResponse(BaseModel):
     total_follow_up_plans: int
     total_follow_up_events: int
     active_config_versions: int
-    latest_runtime_executions: list[AdminTraceExecutionSummaryResponse] = Field(default_factory=list)
+    latest_runtime_executions: list[AdminTraceExecutionSummaryResponse] = Field(
+        default_factory=list
+    )
     intervention_overview: AdminInterventionOverviewResponse
     safety_flow_overview: AdminSafetyFlowOverviewResponse = Field(
         default_factory=AdminSafetyFlowOverviewResponse
@@ -362,3 +364,83 @@ class AdminAuditLogResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AdminOrganizationSummaryResponse(BaseModel):
+    id: str
+    name: str
+    slug: str
+    status: str
+    is_active: bool
+    membership_count: int = 0
+    active_session_count: int = 0
+    latest_session_at: datetime | None = None
+    latest_setting_updated_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminEnterpriseAnalyticsOverviewResponse(BaseModel):
+    total_organizations: int
+    active_organizations: int
+    total_memberships: int
+    membership_breakdown_by_role: dict[str, int] = Field(default_factory=dict)
+    total_auth_sessions: int
+    active_auth_sessions: int
+    expired_auth_sessions: int
+    revoked_auth_sessions: int
+    organization_settings_count: int
+    deployment_settings_count: int
+    stored_artifact_count: int
+    artifact_breakdown_by_provider: dict[str, int] = Field(default_factory=dict)
+    immutable_audit_log_count: int
+    total_safety_events: int
+    high_risk_safety_events: int
+    organizations: list[AdminOrganizationSummaryResponse] = Field(default_factory=list)
+
+
+class AdminEnterpriseOrganizationDetailResponse(BaseModel):
+    organization: AdminOrganizationSummaryResponse
+    membership_breakdown_by_role: dict[str, int] = Field(default_factory=dict)
+    recent_auth_sessions: list[dict[str, Any]] = Field(default_factory=list)
+    organization_settings: dict[str, Any] = Field(default_factory=dict)
+    effective_settings: dict[str, Any] = Field(default_factory=dict)
+    infrastructure_summary: dict[str, Any] = Field(default_factory=dict)
+    recent_artifacts: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class AdminIntegrationEndpointResponse(BaseModel):
+    name: str
+    path: str
+    method: str
+    category: str
+
+
+class AdminIntegrationOverviewResponse(BaseModel):
+    deployment_name: str
+    organization_id: str | None = None
+    auth_mode: str | None = None
+    storage_provider: str
+    secret_backend: str
+    scheduler_backend: str
+    temporal_enabled: bool
+    model_provider_policy: dict[str, Any] = Field(default_factory=dict)
+    feature_flags: dict[str, Any] = Field(default_factory=dict)
+    integration_endpoints: list[AdminIntegrationEndpointResponse] = Field(
+        default_factory=list
+    )
+    artifact_exports_enabled: bool = True
+    audit_exports_enabled: bool = True
+    safety_queue_enabled: bool = True
+    redacted: bool = True
+
+
+class AdminIntegrationRuntimeFeedResponse(BaseModel):
+    generated_at: datetime
+    deployment_name: str
+    organization_id: str | None = None
+    capabilities: dict[str, bool] = Field(default_factory=dict)
+    counts: dict[str, int] = Field(default_factory=dict)
+    model_routing: dict[str, Any] = Field(default_factory=dict)
+    endpoints: list[AdminIntegrationEndpointResponse] = Field(default_factory=list)
+    redacted: bool = True

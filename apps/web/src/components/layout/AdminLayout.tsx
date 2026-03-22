@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   BarChart3,
+  Blocks,
   FileSearch,
   Flag,
   GitCompare,
   History,
   LayoutDashboard,
+  Network,
   Route,
   Settings2,
   ShieldAlert,
@@ -30,6 +32,8 @@ const adminNav = [
   { title: "Config Audit", url: "/admin/audit", icon: GitCompare },
   { title: "Routing / Policy", url: "/admin/policy", icon: Route },
   { title: "Enterprise Settings", url: "/admin/settings", icon: SlidersHorizontal },
+  { title: "Enterprise Analytics", url: "/admin/enterprise-analytics", icon: Blocks },
+  { title: "Integrations", url: "/admin/integrations", icon: Network },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
@@ -91,9 +95,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
           <h2 className="font-heading font-semibold text-foreground">
-            Admin Intelligence, Safety, and Enterprise Governance
+            Admin Intelligence, Safety, Enterprise Analytics, and Integrations
           </h2>
-          <div className="text-xs text-muted-foreground">V4-Pack2</div>
+          <div className="text-xs text-muted-foreground">V4-Pack5</div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
