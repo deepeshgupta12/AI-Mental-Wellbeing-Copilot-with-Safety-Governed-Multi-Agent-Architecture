@@ -2,30 +2,28 @@ import { apiRequest } from "@/lib/api-client";
 import type {
   AdminCarePlanOverview,
   CarePlan,
+  CarePlanAdvancePayload,
+  CarePlanCreatePayload,
   CarePlanEvent,
-  CarePlanUserSummary,
+  CarePlanEventCreatePayload,
+  CarePlanSummary,
+  CarePlanUpdatePayload,
 } from "@/types/care-plans";
 
-export function listCarePlans(params?: {
+export function listCarePlans(params: {
   userId?: string | null;
   organizationId?: string | null;
 }): Promise<CarePlan[]> {
   const search = new URLSearchParams();
-  if (params?.userId) search.set("user_id", params.userId);
-  if (params?.organizationId) search.set("organization_id", params.organizationId);
+
+  if (params.userId) search.set("user_id", params.userId);
+  if (params.organizationId) search.set("organization_id", params.organizationId);
+
   const suffix = search.toString() ? `?${search.toString()}` : "";
   return apiRequest<CarePlan[]>(`/api/v1/care-plans${suffix}`);
 }
 
-export function getCarePlan(carePlanId: string): Promise<CarePlan> {
-  return apiRequest<CarePlan>(`/api/v1/care-plans/${carePlanId}`);
-}
-
-export function getCarePlanUserSummary(userId: string): Promise<CarePlanUserSummary> {
-  return apiRequest<CarePlanUserSummary>(`/api/v1/care-plans/summary?user_id=${encodeURIComponent(userId)}`);
-}
-
-export function createCarePlan(payload: Record<string, unknown>): Promise<CarePlan> {
+export function createCarePlan(payload: CarePlanCreatePayload): Promise<CarePlan> {
   return apiRequest<CarePlan>("/api/v1/care-plans", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -34,7 +32,7 @@ export function createCarePlan(payload: Record<string, unknown>): Promise<CarePl
 
 export function updateCarePlan(
   carePlanId: string,
-  payload: Record<string, unknown>,
+  payload: CarePlanUpdatePayload,
 ): Promise<CarePlan> {
   return apiRequest<CarePlan>(`/api/v1/care-plans/${carePlanId}`, {
     method: "PATCH",
@@ -42,13 +40,9 @@ export function updateCarePlan(
   });
 }
 
-export function listCarePlanEvents(carePlanId: string): Promise<CarePlanEvent[]> {
-  return apiRequest<CarePlanEvent[]>(`/api/v1/care-plans/${carePlanId}/events`);
-}
-
 export function createCarePlanEvent(
   carePlanId: string,
-  payload: Record<string, unknown>,
+  payload: CarePlanEventCreatePayload,
 ): Promise<CarePlanEvent> {
   return apiRequest<CarePlanEvent>(`/api/v1/care-plans/${carePlanId}/events`, {
     method: "POST",
@@ -58,7 +52,7 @@ export function createCarePlanEvent(
 
 export function advanceCarePlan(
   carePlanId: string,
-  payload: Record<string, unknown>,
+  payload: CarePlanAdvancePayload,
 ): Promise<CarePlan> {
   return apiRequest<CarePlan>(`/api/v1/care-plans/${carePlanId}/advance`, {
     method: "POST",
@@ -66,23 +60,37 @@ export function advanceCarePlan(
   });
 }
 
+export function getCarePlanUserSummary(userId: string): Promise<CarePlanSummary> {
+  return apiRequest<CarePlanSummary>(
+    `/api/v1/care-plans/summary?user_id=${encodeURIComponent(userId)}`,
+  );
+}
+
 export function getAdminCarePlanOverview(
   organizationId?: string | null,
 ): Promise<AdminCarePlanOverview> {
-  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
-  return apiRequest<AdminCarePlanOverview>(`/api/v1/admin/care-plans/overview${query}`);
+  const suffix = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<AdminCarePlanOverview>(`/api/v1/admin/care-plans/overview${suffix}`);
 }
 
-export function getAdminCarePlans(
-  organizationId?: string | null,
-): Promise<CarePlan[]> {
-  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
-  return apiRequest<CarePlan[]>(`/api/v1/admin/care-plans${query}`);
+export function getAdminCarePlans(params?: {
+  organizationId?: string | null;
+  limit?: number;
+}): Promise<CarePlan[]> {
+  const search = new URLSearchParams();
+  if (params?.organizationId) search.set("organization_id", params.organizationId);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiRequest<CarePlan[]>(`/api/v1/admin/care-plans${suffix}`);
 }
 
-export function getAdminCarePlanEvents(
-  carePlanId?: string | null,
-): Promise<CarePlanEvent[]> {
-  const query = carePlanId ? `?care_plan_id=${encodeURIComponent(carePlanId)}` : "";
-  return apiRequest<CarePlanEvent[]>(`/api/v1/admin/care-plan-events${query}`);
+export function getAdminCarePlanEvents(params?: {
+  carePlanId?: string | null;
+  limit?: number;
+}): Promise<CarePlanEvent[]> {
+  const search = new URLSearchParams();
+  if (params?.carePlanId) search.set("care_plan_id", params.carePlanId);
+  if (params?.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiRequest<CarePlanEvent[]>(`/api/v1/admin/care-plan-events${suffix}`);
 }
