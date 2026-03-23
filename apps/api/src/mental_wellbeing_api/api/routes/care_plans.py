@@ -12,6 +12,7 @@ from mental_wellbeing_api.schemas.care_plan import (
     CarePlanCreateRequest,
     CarePlanEventCreateRequest,
     CarePlanEventResponse,
+    CarePlanLifecycleRequest,
     CarePlanResponse,
     CarePlanUpdateRequest,
     CarePlanUserSummaryResponse,
@@ -35,12 +36,18 @@ async def create_care_plan(
 async def list_care_plans(
     user_id: UUID | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
+    status: str | None = Query(default=None),
+    preferred_language: str | None = Query(default=None),
+    program_key: str | None = Query(default=None),
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[CarePlanResponse]:
     service = CarePlanService(session)
     return await service.list_care_plans(
         user_id=str(user_id) if user_id else None,
         organization_id=str(organization_id) if organization_id else None,
+        status=status,
+        preferred_language=preferred_language,
+        program_key=program_key,
     )
 
 
@@ -51,7 +58,9 @@ async def get_care_plan_user_summary(
 ) -> CarePlanUserSummaryResponse:
     await ensure_user_exists(session, str(user_id))
     service = CarePlanService(session)
-    return CarePlanUserSummaryResponse(**(await service.build_user_summary(user_id=str(user_id))))
+    return CarePlanUserSummaryResponse(
+        **(await service.build_user_summary(user_id=str(user_id)))
+    )
 
 
 @router.get("/{care_plan_id}", response_model=CarePlanResponse)
@@ -126,6 +135,24 @@ async def advance_care_plan_step(
             care_plan_id=str(care_plan_id),
             next_step_key=payload.next_step_key,
             notes=payload.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/{care_plan_id}/lifecycle", response_model=CarePlanResponse)
+async def lifecycle_care_plan(
+    care_plan_id: UUID,
+    payload: CarePlanLifecycleRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> CarePlanResponse:
+    service = CarePlanService(session)
+    try:
+        return await service.transition_lifecycle(
+            care_plan_id=str(care_plan_id),
+            action=payload.action,
+            notes=payload.notes,
+            reset_history=payload.reset_history,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

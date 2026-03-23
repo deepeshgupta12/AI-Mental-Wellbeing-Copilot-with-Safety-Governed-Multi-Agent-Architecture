@@ -48,3 +48,10 @@ class AdminLocalizationOverviewResponse(BaseModel):
     content_language_breakdown: dict[str, int] = Field(default_factory=dict)
     fallback_language_breakdown: dict[str, int] = Field(default_factory=dict)
     care_plan_language_breakdown: dict[str, int] = Field(default_factory=dict)
+    recent_preference_adoption_7d: dict[str, int] = Field(default_factory=dict)
+    recent_preference_adoption_30d: dict[str, int] = Field(default_factory=dict)
+    fallback_usage_count: int = 0
+    top_preferred_language: str | None = None
+    top_care_plan_language: str | None = None
+    alignment_alerts: list[str] = Field(default_factory=list)
+    fallback_gap_alerts: list[str] = Field(default_factory=list)

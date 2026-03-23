@@ -6,17 +6,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   Globe2,
+  Languages,
   ListChecks,
   MessageCircle,
   Settings2,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/api-client";
 import {
   getLocalizationCatalog,
+  getLocalizationRuntimeCopy,
   getUserLanguagePreference,
   updateUserLanguagePreference,
 } from "@/lib/localization-api";
@@ -51,6 +53,7 @@ export default function SettingsPage() {
   const [preferredLanguage, setPreferredLanguage] = useState("en");
   const [contentLanguage, setContentLanguage] = useState("en");
   const [fallbackLanguage, setFallbackLanguage] = useState("en");
+  const [previewLanguage, setPreviewLanguage] = useState("en");
 
   const userQuery = useQuery({
     queryKey: ["user", userId],
@@ -70,6 +73,12 @@ export default function SettingsPage() {
     enabled: !!userId,
   });
 
+  const previewQuery = useQuery({
+    queryKey: ["localization-runtime-copy", previewLanguage],
+    queryFn: () => getLocalizationRuntimeCopy(previewLanguage),
+    enabled: !!userId,
+  });
+
   const saveLanguageMutation = useMutation({
     mutationFn: async () =>
       updateUserLanguagePreference(userId!, {
@@ -82,6 +91,15 @@ export default function SettingsPage() {
     },
   });
 
+  useEffect(() => {
+    const current = languageQuery.data;
+    if (!current) return;
+    setPreferredLanguage(current.preferred_language);
+    setContentLanguage(current.content_language);
+    setFallbackLanguage(current.fallback_language);
+    setPreviewLanguage(current.content_language || current.preferred_language || "en");
+  }, [languageQuery.data]);
+
   const currentSupportStyle = useMemo(() => {
     return userQuery.data?.profile?.support_style ?? "reflective";
   }, [userQuery.data]);
@@ -91,10 +109,8 @@ export default function SettingsPage() {
 
   const supportedLanguages = catalogQuery.data?.supported_languages ?? [];
 
-  const hasLanguageData = !!languageQuery.data;
-
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 md:px-8 md:py-10">
+    <div className="mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-10">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="mb-8">
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
@@ -103,8 +119,8 @@ export default function SettingsPage() {
           </div>
           <h1 className="font-heading text-3xl font-bold text-foreground">Settings</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Choose how support should feel, what language you prefer, and where you want to pick up
-            your next step.
+            Choose how support should feel, what language you prefer, and how the experience
+            should read when you come back.
           </p>
         </div>
 
@@ -114,115 +130,162 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <section className="rounded-3xl border border-border bg-card p-5 shadow-card">
-              <div className="mb-4">
-                <h2 className="font-heading text-xl font-semibold text-foreground">
-                  Language and reading comfort
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Choose the language you want to see most often, the language for content, and the
-                  backup language if something is unavailable.
-                </p>
-              </div>
-
-              {languageQuery.isLoading || catalogQuery.isLoading ? (
-                <div className="rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
-                  Loading language settings...
+            <section className="space-y-6">
+              <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+                <div className="mb-4">
+                  <h2 className="font-heading text-xl font-semibold text-foreground">
+                    Language and reading comfort
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Choose the language you want to see most often, the language for content,
+                    and the backup language if something is unavailable.
+                  </p>
                 </div>
-              ) : (
-                <>
-                  {hasLanguageData ? (
+
+                {languageQuery.isLoading || catalogQuery.isLoading ? (
+                  <div className="rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
+                    Loading language settings...
+                  </div>
+                ) : (
+                  <>
                     <div className="mb-4 grid gap-3 sm:grid-cols-3">
                       <div className="rounded-xl border border-border bg-background p-4">
                         <p className="text-xs text-muted-foreground">Preferred language</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {languageQuery.data?.preferred_language}
+                          {languageQuery.data?.preferred_language ?? preferredLanguage}
                         </p>
                       </div>
                       <div className="rounded-xl border border-border bg-background p-4">
                         <p className="text-xs text-muted-foreground">Content language</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {languageQuery.data?.content_language}
+                          {languageQuery.data?.content_language ?? contentLanguage}
                         </p>
                       </div>
                       <div className="rounded-xl border border-border bg-background p-4">
                         <p className="text-xs text-muted-foreground">Fallback language</p>
                         <p className="mt-1 text-sm font-medium text-foreground">
-                          {languageQuery.data?.fallback_language}
+                          {languageQuery.data?.fallback_language ?? fallbackLanguage}
                         </p>
                       </div>
                     </div>
-                  ) : null}
 
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-foreground">Preferred language</span>
-                      <select
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-                        value={preferredLanguage}
-                        onChange={(e) => setPreferredLanguage(e.target.value)}
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Preferred language</span>
+                        <select
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          value={preferredLanguage}
+                          onChange={(e) => {
+                            setPreferredLanguage(e.target.value);
+                            setPreviewLanguage(e.target.value);
+                          }}
+                        >
+                          {supportedLanguages.map((item) => (
+                            <option key={item.language_code} value={item.language_code}>
+                              {item.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Content language</span>
+                        <select
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          value={contentLanguage}
+                          onChange={(e) => {
+                            setContentLanguage(e.target.value);
+                            setPreviewLanguage(e.target.value);
+                          }}
+                        >
+                          {supportedLanguages.map((item) => (
+                            <option key={item.language_code} value={item.language_code}>
+                              {item.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Fallback language</span>
+                        <select
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                          value={fallbackLanguage}
+                          onChange={(e) => setFallbackLanguage(e.target.value)}
+                        >
+                          {supportedLanguages.map((item) => (
+                            <option key={item.language_code} value={item.language_code}>
+                              {item.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <Button
+                        variant="hero"
+                        onClick={() => saveLanguageMutation.mutate()}
+                        disabled={saveLanguageMutation.isPending}
                       >
-                        {supportedLanguages.map((item) => (
-                          <option key={item.language_code} value={item.language_code}>
-                            {item.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-foreground">Content language</span>
-                      <select
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-                        value={contentLanguage}
-                        onChange={(e) => setContentLanguage(e.target.value)}
+                        Save language preferences
+                      </Button>
+                      <Button
+                        variant="soft"
+                        onClick={() => {
+                          const current = languageQuery.data;
+                          setPreferredLanguage(current?.preferred_language ?? "en");
+                          setContentLanguage(current?.content_language ?? "en");
+                          setFallbackLanguage(current?.fallback_language ?? "en");
+                          setPreviewLanguage(current?.content_language ?? "en");
+                        }}
                       >
-                        {supportedLanguages.map((item) => (
-                          <option key={item.language_code} value={item.language_code}>
-                            {item.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        Reset to current
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
 
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-foreground">Fallback language</span>
-                      <select
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-                        value={fallbackLanguage}
-                        onChange={(e) => setFallbackLanguage(e.target.value)}
-                      >
-                        {supportedLanguages.map((item) => (
-                          <option key={item.language_code} value={item.language_code}>
-                            {item.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
+              <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+                <div className="mb-4 flex items-center gap-2">
+                  <Languages className="h-5 w-5 text-primary" />
+                  <h2 className="font-heading text-xl font-semibold text-foreground">
+                    Preview how support sounds
+                  </h2>
+                </div>
 
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <Button
-                      variant="hero"
-                      onClick={() => saveLanguageMutation.mutate()}
-                      disabled={saveLanguageMutation.isPending}
-                    >
-                      Save language preferences
-                    </Button>
-                    <Button
-                      variant="soft"
-                      onClick={() => {
-                        const current = languageQuery.data;
-                        setPreferredLanguage(current?.preferred_language ?? "en");
-                        setContentLanguage(current?.content_language ?? "en");
-                        setFallbackLanguage(current?.fallback_language ?? "en");
-                      }}
-                    >
-                      Reset to current
-                    </Button>
-                  </div>
-                </>
-              )}
+                <label className="mb-4 block space-y-2">
+                  <span className="text-sm font-medium text-foreground">Preview language</span>
+                  <select
+                    value={previewLanguage}
+                    onChange={(e) => setPreviewLanguage(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  >
+                    {supportedLanguages.map((item) => (
+                      <option key={item.language_code} value={item.language_code}>
+                        {item.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {Object.entries(previewQuery.data?.copy ?? {}).slice(0, 6).map(([key, value]) => (
+                    <div key={key} className="rounded-xl border border-border bg-background p-4">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {key}
+                      </p>
+                      <p className="mt-2 text-sm text-foreground">{String(value)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
+                  This preview helps you check whether the language feels clear, supportive,
+                  and natural before you keep using it.
+                </div>
+              </div>
             </section>
 
             <section className="space-y-6">
@@ -288,17 +351,21 @@ export default function SettingsPage() {
               </div>
 
               <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
-                <h2 className="font-heading text-xl font-semibold text-foreground">
-                  Helpful shortcuts
-                </h2>
-                <div className="mt-4 space-y-3">
+                <div className="mb-4 flex items-center gap-2">
+                  <Globe2 className="h-5 w-5 text-primary" />
+                  <h2 className="font-heading text-xl font-semibold text-foreground">
+                    Helpful shortcuts
+                  </h2>
+                </div>
+
+                <div className="space-y-3">
                   <Link
                     href="/app/plans"
                     className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-aether hover:bg-muted"
                   >
                     <span className="flex items-center gap-2">
                       <ListChecks className="h-4 w-4 text-muted-foreground" />
-                      Open Quick Plans
+                      Open Plans
                     </span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </Link>
@@ -308,7 +375,7 @@ export default function SettingsPage() {
                     className="flex items-center justify-between rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground transition-aether hover:bg-muted"
                   >
                     <span className="flex items-center gap-2">
-                      <Globe2 className="h-4 w-4 text-muted-foreground" />
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
                       Open Support Programs
                     </span>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -330,10 +397,16 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {(saveLanguageMutation.isError || languageQuery.isError || catalogQuery.isError) && (
+        {(saveLanguageMutation.isError ||
+          languageQuery.isError ||
+          catalogQuery.isError ||
+          previewQuery.isError) && (
           <div className="mt-6 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
             {getApiErrorMessage(
-              saveLanguageMutation.error || languageQuery.error || catalogQuery.error,
+              saveLanguageMutation.error ||
+                languageQuery.error ||
+                catalogQuery.error ||
+                previewQuery.error,
             )}
           </div>
         )}

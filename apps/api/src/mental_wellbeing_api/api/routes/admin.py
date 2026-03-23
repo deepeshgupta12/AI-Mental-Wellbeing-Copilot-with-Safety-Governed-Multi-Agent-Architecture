@@ -468,11 +468,22 @@ async def get_care_plan_overview(
 @router.get("/care-plans", response_model=list[CarePlanResponse])
 async def get_admin_care_plans(
     organization_id: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+    preferred_language: str | None = Query(default=None),
+    program_key: str | None = Query(default=None),
+    attention_state: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
     session: AsyncSession = Depends(db_session_dep),
 ) -> list[CarePlanResponse]:
     service = CarePlanService(session)
-    return await service.list_care_plans(organization_id=organization_id, limit=limit)
+    return await service.list_care_plans(
+        organization_id=organization_id,
+        status=status,
+        preferred_language=preferred_language,
+        program_key=program_key,
+        attention_state=attention_state,
+        limit=limit,
+    )
 
 
 @router.get("/care-plan-events", response_model=list[CarePlanEventResponse])
