@@ -16,8 +16,11 @@ from mental_wellbeing_api.schemas.agent_runtime import (
     NodeTraceEventResponse,
     RecalledMemoryItemResponse,
 )
+from mental_wellbeing_api.schemas.care_plan import CarePlanResponse
 from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
+from mental_wellbeing_api.services.care_plan_service import CarePlanService
 from mental_wellbeing_api.services.follow_up_service import FollowUpService
+from mental_wellbeing_api.services.localization_service import LocalizationService
 from mental_wellbeing_api.services.memory_service import MemoryRecallItem, MemoryService
 from mental_wellbeing_api.services.preference_service import PreferenceService
 from mental_wellbeing_api.services.safety_review_service import SafetyReviewService
@@ -40,6 +43,8 @@ class AgentRuntimeService:
         self.follow_up_service = FollowUpService(session)
         self.safety_review_service = SafetyReviewService(session)
         self.temporal_contract_service = TemporalContractService()
+        self.localization_service = LocalizationService(session)
+        self.care_plan_service = CarePlanService(session)
 
     async def evaluate_safety_only(
         self,
@@ -69,6 +74,31 @@ class AgentRuntimeService:
             updated["preferred_support_mode"] = mapped
         return updated
 
+    def _merge_language_preferences(
+        self,
+        *,
+        preference_signals: dict[str, str],
+        language_preferences: dict[str, str] | None,
+    ) -> dict[str, str]:
+        updated = dict(preference_signals)
+        if not language_preferences:
+            return updated
+
+        preferred_language = self.localization_service.normalize_language(
+            language_preferences.get("preferred_language")
+        )
+        content_language = self.localization_service.normalize_language(
+            language_preferences.get("content_language") or preferred_language
+        )
+        fallback_language = self.localization_service.normalize_language(
+            language_preferences.get("fallback_language")
+        )
+
+        updated["preferred_language"] = preferred_language
+        updated["content_language"] = content_language
+        updated["fallback_language"] = fallback_language
+        return updated
+
     async def _log_memory_trace(
         self,
         *,
@@ -88,6 +118,8 @@ class AgentRuntimeService:
             input_payload_json={
                 "user_id": user_id,
                 "preference_keys": list(preference_signals.keys()),
+                "preferred_language": preference_signals.get("preferred_language"),
+                "content_language": preference_signals.get("content_language"),
             },
             output_payload_json={
                 "memory_hits": [
@@ -117,6 +149,13 @@ class AgentRuntimeService:
             "scheduled_for": result.get("follow_up_due_at"),
             "delivery_channel": result.get("follow_up_delivery_channel"),
             "status": result.get("follow_up_status"),
+        }
+
+    def _build_care_plan_preview(self, result: dict) -> dict:
+        return {
+            "program_key": result.get("care_program_key"),
+            "language": result.get("care_plan_language"),
+            "required": bool(result.get("care_plan_required", False)),
         }
 
     def _build_alertable_safety_trace(self, result: dict) -> bool:
@@ -199,6 +238,12 @@ class AgentRuntimeService:
                     "decision_path_label": result.get("decision_path_label"),
                     "alertable_safety_trace": alertable_safety_trace,
                     "safety_temporal_contract": safety_temporal_contract,
+                    "preferred_language": result.get("preferred_language"),
+                    "content_language": result.get("content_language"),
+                    "fallback_language": result.get("fallback_language"),
+                    "care_plan_required": result.get("care_plan_required"),
+                    "care_program_key": result.get("care_program_key"),
+                    "care_plan_language": result.get("care_plan_language"),
                 },
                 output_payload_json={
                     "status": event.get("status"),
@@ -268,6 +313,8 @@ class AgentRuntimeService:
                     "evidence_bundle": result.get("evidence_bundle", {}),
                     "audit_snapshot": result.get("audit_snapshot", {}),
                     "alertable_safety_trace": result.get("alertable_safety_trace", False),
+                    "preferred_language": result.get("preferred_language"),
+                    "content_language": result.get("content_language"),
                 },
                 event_payload_json={
                     "trace_id": result.get("trace_id"),
@@ -283,6 +330,106 @@ class AgentRuntimeService:
             result["queue_status"] = event.queue_status
             result["review_recommended"] = bool(safety_eval.requires_human_review)
 
+    async def _create_runtime_care_plan(
+        self,
+        *,
+        payload: AgentRuntimeSmokeRequest,
+        result: dict,
+        preference_signals: dict[str, str],
+        trace_id: str,
+    ) -> CarePlanResponse | None:
+        if payload.user_id is None:
+            return None
+
+        if not bool(result.get("care_plan_required", False)):
+            return None
+
+        if bool(result.get("safety_override", False)):
+            return None
+
+        user_id = str(payload.user_id)
+        user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
+        if not user_exists:
+            return None
+
+        preferred_language = self.localization_service.normalize_language(
+            result.get("care_plan_language")
+            or result.get("preferred_language")
+            or preference_signals.get("preferred_language")
+        )
+
+        program_key = str(
+            result.get("care_program_key")
+            or result.get("follow_up_plan_type")
+            or result.get("support_mode")
+            or "general_care_program"
+        )
+
+        title = (
+            result.get("follow_up_plan_title")
+            or result.get("follow_up_plan", {}).get("title")
+            or self.localization_service.localize_text(
+                "care_plan_title_default",
+                preferred_language,
+                "Continue your care plan",
+            )
+        )
+
+        description = (
+            result.get("follow_up_plan_description")
+            or result.get("follow_up_plan", {}).get("description")
+            or (
+                result.get("follow_up_suggestions", [None])[0]
+                if result.get("follow_up_suggestions")
+                else None
+            )
+        )
+
+        created_plan = await self.care_plan_service.create_care_plan(
+            payload={
+                "user_id": user_id,
+                "organization_id": None,
+                "session_id": None,
+                "action_plan_id": None,
+                "source_agent": result.get("specialist_agent") or "response_composer",
+                "program_key": program_key,
+                "title": title,
+                "description": description,
+                "preferred_language": preferred_language,
+                "timezone": preference_signals.get("timezone"),
+                "cadence_json": {"every_n_days": 7},
+                "metadata_json": {
+                    "trace_id": trace_id,
+                    "routing_contract": result.get("routing_contract", {}),
+                    "support_mode": result.get("support_mode"),
+                    "support_strategy": result.get("support_strategy"),
+                    "specialist_agent": result.get("specialist_agent"),
+                    "follow_up_contract": result.get("follow_up_contract", {}),
+                },
+            }
+        )
+
+        await self.care_plan_service.record_event(
+            care_plan_id=created_plan.id,
+            user_id=user_id,
+            event_type="runtime_created",
+            event_status=created_plan.status,
+            step_key=created_plan.current_step_key,
+            adherence_score=None,
+            notes="Runtime-generated care plan created.",
+            event_payload_json={
+                "trace_id": trace_id,
+                "program_key": program_key,
+                "preferred_language": preferred_language,
+            },
+        )
+
+        result["care_program_key"] = created_plan.program_key
+        result["care_plan_language"] = created_plan.preferred_language
+        result["generated_care_plan_id"] = created_plan.id
+
+        return CarePlanResponse.model_validate(created_plan)
+
     async def run_smoke_flow(
         self,
         payload: AgentRuntimeSmokeRequest,
@@ -295,17 +442,45 @@ class AgentRuntimeService:
         what_helped_before: list[str] = []
         trend_bundle: dict = {}
         generated_follow_up_plan = None
+        generated_care_plan = None
         follow_up_event_ids: list[str] = []
+
+        preferred_language = self.localization_service.DEFAULT_LANGUAGE
+        content_language = self.localization_service.DEFAULT_LANGUAGE
+        fallback_language = self.localization_service.DEFAULT_LANGUAGE
+        localized_runtime_copy = self.localization_service.runtime_copy(content_language)
 
         if payload.user_id is not None:
             user_id = str(payload.user_id)
             user_exists = await self.session.scalar(select(User.id).where(User.id == user_id))
             if user_exists:
                 base_preference_signals = await self.preference_service.get_preference_signals(user_id)
-                preference_signals = self._apply_ui_mode_overrides(
+                language_preferences = await self.localization_service.get_user_language_preference(
+                    user_id
+                )
+
+                preference_signals = self._merge_language_preferences(
                     preference_signals=base_preference_signals,
+                    language_preferences=language_preferences,
+                )
+                preference_signals = self._apply_ui_mode_overrides(
+                    preference_signals=preference_signals,
                     ui_mode=payload.ui_mode,
                 )
+
+                preferred_language = preference_signals.get(
+                    "preferred_language",
+                    self.localization_service.DEFAULT_LANGUAGE,
+                )
+                content_language = preference_signals.get(
+                    "content_language",
+                    preferred_language,
+                )
+                fallback_language = preference_signals.get(
+                    "fallback_language",
+                    self.localization_service.DEFAULT_LANGUAGE,
+                )
+                localized_runtime_copy = self.localization_service.runtime_copy(content_language)
 
                 recalled_memory_items = await self.memory_service.recall(
                     user_id=user_id,
@@ -379,6 +554,10 @@ class AgentRuntimeService:
                 "follow_up_event_ids": [],
                 "temporal_contract": {},
                 "scheduler_backend": None,
+                "care_plan_required": False,
+                "care_program_key": None,
+                "care_plan_language": content_language,
+                "generated_care_plan_id": None,
                 "risk_level": safety_eval.risk_level,
                 "safety_flag_type": safety_eval.safety_flag_type,
                 "safety_summary": safety_eval.safety_summary,
@@ -395,6 +574,10 @@ class AgentRuntimeService:
                 "review_recommended": False,
                 "alertable_safety_trace": False,
                 "safety_temporal_contract": {},
+                "preferred_language": preferred_language,
+                "content_language": content_language,
+                "fallback_language": fallback_language,
+                "localized_runtime_copy": localized_runtime_copy.get("copy", {}),
             }
         )
 
@@ -419,10 +602,34 @@ class AgentRuntimeService:
                 learned_preferences=result.get("learned_preferences"),
             )
             refreshed_preference_signals = await self.preference_service.get_preference_signals(user_id)
-            preference_signals = self._apply_ui_mode_overrides(
+            language_preferences = await self.localization_service.get_user_language_preference(user_id)
+            preference_signals = self._merge_language_preferences(
                 preference_signals=refreshed_preference_signals,
+                language_preferences=language_preferences,
+            )
+            preference_signals = self._apply_ui_mode_overrides(
+                preference_signals=preference_signals,
                 ui_mode=payload.ui_mode,
             )
+
+            preferred_language = preference_signals.get(
+                "preferred_language",
+                self.localization_service.DEFAULT_LANGUAGE,
+            )
+            content_language = preference_signals.get(
+                "content_language",
+                preferred_language,
+            )
+            fallback_language = preference_signals.get(
+                "fallback_language",
+                self.localization_service.DEFAULT_LANGUAGE,
+            )
+            localized_runtime_copy = self.localization_service.runtime_copy(content_language)
+
+            result["preferred_language"] = preferred_language
+            result["content_language"] = content_language
+            result["fallback_language"] = fallback_language
+            result["localized_runtime_copy"] = localized_runtime_copy.get("copy", {})
 
             if bool(result.get("follow_up_required")) and not bool(result.get("safety_override", False)):
                 created_plan = await self.follow_up_service.create_plan(
@@ -445,6 +652,8 @@ class AgentRuntimeService:
                         "temporal_contract": result.get("temporal_contract", {}),
                         "scheduler_backend": result.get("scheduler_backend"),
                         "follow_up_suggestions": result.get("follow_up_suggestions", [])[:3],
+                        "preferred_language": preferred_language,
+                        "content_language": content_language,
                     },
                 )
                 generated_follow_up_plan = FollowUpPlanResponse.model_validate(created_plan)
@@ -459,6 +668,7 @@ class AgentRuntimeService:
                         "scheduler_backend": result.get("scheduler_backend"),
                         "follow_up_due_at": result.get("follow_up_due_at"),
                         "temporal_contract": result.get("temporal_contract", {}),
+                        "preferred_language": preferred_language,
                     },
                 )
                 follow_up_event_ids = [created_event.id]
@@ -471,6 +681,13 @@ class AgentRuntimeService:
                 )
                 result["follow_up_plan_id"] = created_plan.id
                 result["follow_up_event_ids"] = follow_up_event_ids
+
+            generated_care_plan = await self._create_runtime_care_plan(
+                payload=payload,
+                result=result,
+                preference_signals=preference_signals,
+                trace_id=trace_id,
+            )
 
             await self._create_safety_runtime_artifacts(
                 payload=payload,
@@ -532,6 +749,14 @@ class AgentRuntimeService:
             temporal_contract=result.get("temporal_contract", {}),
             scheduler_backend=result.get("scheduler_backend"),
             generated_follow_up_plan=generated_follow_up_plan,
+            care_plan_required=bool(result.get("care_plan_required", False)),
+            care_plan=self._build_care_plan_preview(result),
+            care_plan_id=generated_care_plan.id if generated_care_plan else result.get("generated_care_plan_id"),
+            generated_care_plan=generated_care_plan,
+            preferred_language=preferred_language,
+            content_language=content_language,
+            fallback_language=fallback_language,
+            localized_runtime_copy=localized_runtime_copy.get("copy", {}),
             memory_hits=[
                 RecalledMemoryItemResponse(
                     source_type=item.source_type,

@@ -10,6 +10,8 @@ import {
   FileSearch,
   Flag,
   GitCompare,
+  Globe2,
+  HeartHandshake,
   History,
   LayoutDashboard,
   Network,
@@ -34,6 +36,8 @@ const adminNav = [
   { title: "Enterprise Settings", url: "/admin/settings", icon: SlidersHorizontal },
   { title: "Enterprise Analytics", url: "/admin/enterprise-analytics", icon: Blocks },
   { title: "Integrations", url: "/admin/integrations", icon: Network },
+  { title: "Care Plans", url: "/admin/care-plans", icon: HeartHandshake },
+  { title: "Localization", url: "/admin/localization", icon: Globe2 },
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
 ];
 
@@ -95,9 +99,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
           <h2 className="font-heading font-semibold text-foreground">
-            Admin Intelligence, Safety, Enterprise Analytics, and Integrations
+            Admin Intelligence, Care Programs, Localization, Safety, Enterprise Analytics, and Integrations
           </h2>
-          <div className="text-xs text-muted-foreground">V4-Pack5</div>
+          <div className="text-xs text-muted-foreground">V4-Pack8</div>
         </header>
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

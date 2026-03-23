@@ -9,7 +9,12 @@ from sqlalchemy.orm import selectinload
 
 from mental_wellbeing_api.api.deps import db_session_dep
 from mental_wellbeing_api.models.user import User, UserProfile
+from mental_wellbeing_api.schemas.localization import (
+    UserLanguagePreferenceResponse,
+    UserLanguagePreferenceUpdateRequest,
+)
 from mental_wellbeing_api.schemas.user import UserCreateRequest, UserResponse
+from mental_wellbeing_api.services.localization_service import LocalizationService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -56,3 +61,39 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+@router.get("/{user_id}/language", response_model=UserLanguagePreferenceResponse)
+async def get_user_language(
+    user_id: UUID,
+    session: AsyncSession = Depends(db_session_dep),
+) -> UserLanguagePreferenceResponse:
+    user = await session.scalar(select(User.id).where(User.id == str(user_id)))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    service = LocalizationService(session)
+    return UserLanguagePreferenceResponse(
+        **(await service.get_user_language_preference(str(user_id)))
+    )
+
+
+@router.put("/{user_id}/language", response_model=UserLanguagePreferenceResponse)
+async def update_user_language(
+    user_id: UUID,
+    payload: UserLanguagePreferenceUpdateRequest,
+    session: AsyncSession = Depends(db_session_dep),
+) -> UserLanguagePreferenceResponse:
+    user = await session.scalar(select(User.id).where(User.id == str(user_id)))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    service = LocalizationService(session)
+    return UserLanguagePreferenceResponse(
+        **(
+            await service.upsert_user_language_preference(
+                user_id=str(user_id),
+                preferred_language=payload.preferred_language,
+                content_language=payload.content_language,
+                fallback_language=payload.fallback_language,
+            )
+        )
+    )

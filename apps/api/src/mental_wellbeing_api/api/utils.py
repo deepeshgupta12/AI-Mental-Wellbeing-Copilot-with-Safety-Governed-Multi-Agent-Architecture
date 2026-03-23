@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.models.action_plan import ActionPlan
+from mental_wellbeing_api.models.care_plan import CarePlan
 from mental_wellbeing_api.models.conversation import ConversationSession
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
 from mental_wellbeing_api.models.user import User
@@ -42,3 +43,11 @@ async def ensure_follow_up_plan_exists(
     )
     if not follow_up_plan_exists:
         raise HTTPException(status_code=404, detail="Follow up plan not found")
+
+
+async def ensure_care_plan_exists(session: AsyncSession, care_plan_id: str) -> None:
+    care_plan_exists = await session.scalar(
+        select(CarePlan.id).where(CarePlan.id == care_plan_id)
+    )
+    if not care_plan_exists:
+        raise HTTPException(status_code=404, detail="Care plan not found")

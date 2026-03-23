@@ -6,6 +6,7 @@ from typing import Any
 from mental_wellbeing_api.orchestration.runtime import append_execution_event, append_handoff
 from mental_wellbeing_api.orchestration.state import AgentRuntimeState
 from mental_wellbeing_api.services.follow_up_contract_service import FollowUpContractService
+from mental_wellbeing_api.services.localization_service import LocalizationService
 
 
 def _resolve_follow_up_required(state: AgentRuntimeState) -> bool:
@@ -43,7 +44,7 @@ def _resolve_follow_up_plan_type(state: AgentRuntimeState) -> str:
     return "general_follow_up"
 
 
-def _resolve_follow_up_title(state: AgentRuntimeState) -> str:
+def _resolve_follow_up_title(state: AgentRuntimeState, language: str) -> str:
     support_mode = (state.get("support_mode") or "").strip().lower()
 
     title_map = {
@@ -55,23 +56,55 @@ def _resolve_follow_up_title(state: AgentRuntimeState) -> str:
         "activate": "Restart with one small step",
         "stabilize": "Follow up on stabilization",
     }
-    return title_map.get(support_mode, "Continue this support plan")
+    fallback = title_map.get(support_mode, "Continue this support plan")
+    service = LocalizationService(None)  # type: ignore[arg-type]
+    if language == "hi":
+        hi_map = {
+            "plan": "अपने प्लान पर फिर से नज़र डालें",
+            "recover": "रिकवरी पर दोबारा चेक-इन करें",
+            "reflect": "इस चिंतन को आगे बढ़ाएँ",
+            "connect": "किसी से जुड़ने पर फॉलो-अप करें",
+            "reframe": "इस सोच को फिर से देखें",
+            "activate": "एक छोटे कदम से फिर शुरू करें",
+            "stabilize": "स्थिरता पर फॉलो-अप करें",
+        }
+        return hi_map.get(support_mode, service.localize_text("care_plan_title_default", language, fallback))
+    if language == "hinglish":
+        hinglish_map = {
+            "plan": "Apne plan par check-in karo",
+            "recover": "Recovery par dobara check-in karo",
+            "reflect": "Is reflection ko aage badhao",
+            "connect": "Reach out karne par follow-up karo",
+            "reframe": "Is thought ko phir se dekho",
+            "activate": "Ek chhote step se phir shuru karo",
+            "stabilize": "Stability par follow-up karo",
+        }
+        return hinglish_map.get(support_mode, fallback)
+    return fallback
 
 
-def _resolve_follow_up_description(state: AgentRuntimeState) -> str:
+def _resolve_follow_up_description(state: AgentRuntimeState, language: str) -> str:
     follow_up_suggestions = state.get("follow_up_suggestions", [])
+    service = LocalizationService(None)  # type: ignore[arg-type]
+
     if follow_up_suggestions:
-        return str(follow_up_suggestions[0])
+        value = str(follow_up_suggestions[0])
+    elif state.get("progress_summary"):
+        value = f"Revisit your progress: {state.get('progress_summary')}"
+    elif state.get("support_strategy"):
+        value = f"Follow up on the {state.get('support_strategy')} support plan."
+    else:
+        value = "Check in on the next small step from this support session."
 
-    progress_summary = state.get("progress_summary")
-    if progress_summary:
-        return f"Revisit your progress: {progress_summary}"
-
-    support_strategy = state.get("support_strategy")
-    if support_strategy:
-        return f"Follow up on the {support_strategy} support plan."
-
-    return "Check in on the next small step from this support session."
+    if language == "hi":
+        return {
+            "Check in on the next small step from this support session.": "इस सपोर्ट सेशन के अगले छोटे कदम पर फिर से चेक-इन करें।",
+        }.get(value, value)
+    if language == "hinglish":
+        return {
+            "Check in on the next small step from this support session.": "Is support session ke next small step par check-in karo.",
+        }.get(value, value)
+    return service.localize_text("care_plan_step_complete", language, value) if value == "Step completed" else value
 
 
 def _build_temporal_contract(
@@ -105,6 +138,12 @@ def _build_temporal_contract(
 
 def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     follow_up_required = _resolve_follow_up_required(state)
+    language = (
+        state.get("preferred_language")
+        or state.get("content_language")
+        or state.get("preference_signals", {}).get("preferred_language")
+        or "en"
+    )
 
     if not follow_up_required:
         state = {
@@ -128,6 +167,7 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             metadata={
                 "follow_up_required": False,
                 "reason": "no continuity trigger detected",
+                "language": language,
             },
         )
         state = append_handoff(
@@ -141,8 +181,8 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     contracts = FollowUpContractService()
 
     plan_type = _resolve_follow_up_plan_type(state)
-    title = _resolve_follow_up_title(state)
-    description = _resolve_follow_up_description(state)
+    title = _resolve_follow_up_title(state, language)
+    description = _resolve_follow_up_description(state, language)
     delivery_channel = "in_app"
     timezone_name = state.get("preference_signals", {}).get("timezone")
 
@@ -162,6 +202,7 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             "routing_contract": state.get("routing_contract", {}),
             "follow_up_suggestions": state.get("follow_up_suggestions", [])[:3],
             "generated_at": datetime.now(UTC).isoformat(),
+            "language": language,
         },
     )
 
@@ -182,6 +223,7 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         "cadence_json": contract.get("cadence_json", {}),
         "scheduling_contract_json": scheduling_contract_json,
         "metadata_json": contract.get("metadata_json", {}),
+        "language": language,
     }
 
     temporal_contract = _build_temporal_contract(
@@ -205,6 +247,9 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
         "follow_up_event_ids": [],
         "temporal_contract": temporal_contract,
         "scheduler_backend": scheduler_backend,
+        "care_plan_required": True,
+        "care_program_key": f"{plan_type}_program",
+        "care_plan_language": language,
     }
     state = append_execution_event(
         state,
@@ -214,6 +259,7 @@ def run_follow_up_planner_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             "plan_type": plan_type,
             "delivery_channel": delivery_channel,
             "scheduler_backend": scheduler_backend,
+            "language": language,
         },
     )
     state = append_handoff(
