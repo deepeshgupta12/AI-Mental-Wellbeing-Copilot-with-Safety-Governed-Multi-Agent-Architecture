@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import desc, select
@@ -211,6 +212,10 @@ class LocalizationService:
         if self.session is None:
             raise ValueError("Database session is required")
 
+        now = datetime.now(UTC)
+        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
+
         preference_rows = list(
             (
                 await self.session.scalars(
@@ -226,7 +231,7 @@ class LocalizationService:
                         UserPreference.is_active.is_(True),
                     )
                     .order_by(desc(UserPreference.created_at))
-                    .limit(3000)
+                    .limit(5000)
                 )
             ).all()
         )
@@ -240,6 +245,8 @@ class LocalizationService:
         preferred_counter = Counter()
         content_counter = Counter()
         fallback_counter = Counter()
+        recent_preferred_7d = Counter()
+        recent_preferred_30d = Counter()
 
         for (_user_id, preference_key), row in latest_by_user_and_key.items():
             value = self.normalize_language((row.preference_value_json or {}).get("value"))
@@ -250,6 +257,16 @@ class LocalizationService:
             elif preference_key == "fallback_language":
                 fallback_counter[value] += 1
 
+        for row in preference_rows:
+            if row.preference_key != "preferred_language":
+                continue
+            value = self.normalize_language((row.preference_value_json or {}).get("value"))
+            created_at = row.created_at
+            if created_at is not None and created_at >= seven_days_ago:
+                recent_preferred_7d[value] += 1
+            if created_at is not None and created_at >= thirty_days_ago:
+                recent_preferred_30d[value] += 1
+
         care_plan_stmt = select(CarePlan)
         if organization_id:
             care_plan_stmt = care_plan_stmt.where(CarePlan.organization_id == organization_id)
@@ -259,6 +276,86 @@ class LocalizationService:
             self.normalize_language(item.preferred_language) for item in care_plans
         )
 
+        top_preferred_language = (
+            preferred_counter.most_common(1)[0][0] if preferred_counter else None
+        )
+        top_care_plan_language = (
+            care_plan_counter.most_common(1)[0][0] if care_plan_counter else None
+        )
+
+        fallback_usage_count = 0
+        user_ids = {
+            user_id
+            for user_id, preference_key in latest_by_user_and_key.keys()
+            if preference_key == "preferred_language"
+        }
+        for user_id in user_ids:
+            preferred = self.normalize_language(
+                (
+                    latest_by_user_and_key.get((user_id, "preferred_language"))
+                    or UserPreference(
+                        preference_value_json={"value": self.DEFAULT_LANGUAGE},
+                        user_id=user_id,
+                        preference_key="preferred_language",
+                    )
+                ).preference_value_json.get("value")  # type: ignore[arg-type]
+            )
+            content = self.normalize_language(
+                (
+                    latest_by_user_and_key.get((user_id, "content_language"))
+                    or UserPreference(
+                        preference_value_json={"value": preferred},
+                        user_id=user_id,
+                        preference_key="content_language",
+                    )
+                ).preference_value_json.get("value")  # type: ignore[arg-type]
+            )
+            fallback = self.normalize_language(
+                (
+                    latest_by_user_and_key.get((user_id, "fallback_language"))
+                    or UserPreference(
+                        preference_value_json={"value": self.DEFAULT_LANGUAGE},
+                        user_id=user_id,
+                        preference_key="fallback_language",
+                    )
+                ).preference_value_json.get("value")  # type: ignore[arg-type]
+            )
+
+            if fallback != content or fallback != preferred:
+                fallback_usage_count += 1
+
+        alignment_alerts: list[str] = []
+        fallback_gap_alerts: list[str] = []
+
+        if (
+            top_preferred_language
+            and top_care_plan_language
+            and top_preferred_language != top_care_plan_language
+        ):
+            alignment_alerts.append(
+                f"Members most often prefer {top_preferred_language}, but care programs are most often configured in {top_care_plan_language}."
+            )
+
+        if preferred_counter.get("hinglish", 0) > care_plan_counter.get("hinglish", 0):
+            alignment_alerts.append(
+                "Hinglish preference is higher than Hinglish care-program delivery. Review whether recurring support should offer more Hinglish coverage."
+            )
+
+        if preferred_counter.get("hi", 0) > care_plan_counter.get("hi", 0):
+            alignment_alerts.append(
+                "Hindi preference is stronger than Hindi care-program usage. Review recurring support language defaults."
+            )
+
+        if fallback_usage_count > 0:
+            fallback_gap_alerts.append(
+                f"{fallback_usage_count} members are relying on a fallback language path. Review missing copy coverage or content-language mismatch."
+            )
+
+        if fallback_counter.get("en", 0) > 0 and preferred_counter.get("hinglish", 0) > 0:
+            fallback_gap_alerts.append(
+                "English is acting as the main fallback while Hinglish preference is active. This may create tone inconsistency."
+            )
+
         return {
             "organization_id": organization_id,
             "default_language": self.DEFAULT_LANGUAGE,
@@ -267,4 +364,11 @@ class LocalizationService:
             "content_language_breakdown": dict(content_counter),
             "fallback_language_breakdown": dict(fallback_counter),
             "care_plan_language_breakdown": dict(care_plan_counter),
+            "recent_preference_adoption_7d": dict(recent_preferred_7d),
+            "recent_preference_adoption_30d": dict(recent_preferred_30d),
+            "fallback_usage_count": fallback_usage_count,
+            "top_preferred_language": top_preferred_language,
+            "top_care_plan_language": top_care_plan_language,
+            "alignment_alerts": alignment_alerts,
+            "fallback_gap_alerts": fallback_gap_alerts,
         }

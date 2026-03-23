@@ -41,4 +41,11 @@ export type AdminLocalizationOverview = {
   content_language_breakdown: Record<string, number>;
   fallback_language_breakdown: Record<string, number>;
   care_plan_language_breakdown: Record<string, number>;
+  recent_preference_adoption_7d: Record<string, number>;
+  recent_preference_adoption_30d: Record<string, number>;
+  fallback_usage_count: number;
+  top_preferred_language: string | null;
+  top_care_plan_language: string | null;
+  alignment_alerts: string[];
+  fallback_gap_alerts: string[];
 };

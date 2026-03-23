@@ -6,6 +6,7 @@ import type {
   CarePlanCreatePayload,
   CarePlanEvent,
   CarePlanEventCreatePayload,
+  CarePlanLifecyclePayload,
   CarePlanSummary,
   CarePlanUpdatePayload,
 } from "@/types/care-plans";
@@ -13,11 +14,17 @@ import type {
 export function listCarePlans(params: {
   userId?: string | null;
   organizationId?: string | null;
+  status?: string | null;
+  preferredLanguage?: string | null;
+  programKey?: string | null;
 }): Promise<CarePlan[]> {
   const search = new URLSearchParams();
 
   if (params.userId) search.set("user_id", params.userId);
   if (params.organizationId) search.set("organization_id", params.organizationId);
+  if (params.status) search.set("status", params.status);
+  if (params.preferredLanguage) search.set("preferred_language", params.preferredLanguage);
+  if (params.programKey) search.set("program_key", params.programKey);
 
   const suffix = search.toString() ? `?${search.toString()}` : "";
   return apiRequest<CarePlan[]>(`/api/v1/care-plans${suffix}`);
@@ -60,6 +67,16 @@ export function advanceCarePlan(
   });
 }
 
+export function lifecycleCarePlan(
+  carePlanId: string,
+  payload: CarePlanLifecyclePayload,
+): Promise<CarePlan> {
+  return apiRequest<CarePlan>(`/api/v1/care-plans/${carePlanId}/lifecycle`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getCarePlanUserSummary(userId: string): Promise<CarePlanSummary> {
   return apiRequest<CarePlanSummary>(
     `/api/v1/care-plans/summary?user_id=${encodeURIComponent(userId)}`,
@@ -75,10 +92,18 @@ export function getAdminCarePlanOverview(
 
 export function getAdminCarePlans(params?: {
   organizationId?: string | null;
+  status?: string | null;
+  preferredLanguage?: string | null;
+  programKey?: string | null;
+  attentionState?: string | null;
   limit?: number;
 }): Promise<CarePlan[]> {
   const search = new URLSearchParams();
   if (params?.organizationId) search.set("organization_id", params.organizationId);
+  if (params?.status) search.set("status", params.status);
+  if (params?.preferredLanguage) search.set("preferred_language", params.preferredLanguage);
+  if (params?.programKey) search.set("program_key", params.programKey);
+  if (params?.attentionState) search.set("attention_state", params.attentionState);
   if (params?.limit) search.set("limit", String(params.limit));
   const suffix = search.toString() ? `?${search.toString()}` : "";
   return apiRequest<CarePlan[]>(`/api/v1/admin/care-plans${suffix}`);

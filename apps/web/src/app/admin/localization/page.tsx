@@ -1,9 +1,16 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Globe2, Languages, MessageSquareText, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  Globe2,
+  Languages,
+  MessageSquareText,
+  ShieldCheck,
+  TrendingUp,
+} from "lucide-react";
 
 import { getApiErrorMessage } from "@/lib/api-client";
 import {
@@ -11,12 +18,6 @@ import {
   getLocalizationCatalog,
   getLocalizationRuntimeCopy,
 } from "@/lib/localization-api";
-
-function topEntry(input: Record<string, number> | undefined) {
-  const entries = Object.entries(input ?? {});
-  if (!entries.length) return null;
-  return entries.sort((a, b) => b[1] - a[1])[0];
-}
 
 export default function AdminLocalizationPage() {
   const [organizationId, setOrganizationId] = useState("");
@@ -37,15 +38,7 @@ export default function AdminLocalizationPage() {
     queryFn: () => getLocalizationRuntimeCopy(previewLanguage),
   });
 
-  const preferredLeader = useMemo(
-    () => topEntry(overviewQuery.data?.language_preference_breakdown),
-    [overviewQuery.data],
-  );
-
-  const carePlanLeader = useMemo(
-    () => topEntry(overviewQuery.data?.care_plan_language_breakdown),
-    [overviewQuery.data],
-  );
+  const overview = overviewQuery.data;
 
   return (
     <div className="p-6 md:p-8">
@@ -58,8 +51,8 @@ export default function AdminLocalizationPage() {
             </div>
             <h1 className="font-heading text-3xl font-bold text-foreground">Language & Copy</h1>
             <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-              Understand what language members prefer, where fallback language is being used, and
-              how recurring support programs are being configured.
+              Understand what language members prefer, where fallback language is being used,
+              and how recurring support programs are being configured.
             </p>
           </div>
 
@@ -76,80 +69,141 @@ export default function AdminLocalizationPage() {
           </label>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <p className="text-xs text-muted-foreground">Default language</p>
             <p className="mt-2 text-3xl font-bold text-foreground">
-              {overviewQuery.data?.default_language ?? "—"}
+              {overview?.default_language ?? "—"}
             </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <p className="text-xs text-muted-foreground">Supported languages</p>
             <p className="mt-2 text-3xl font-bold text-foreground">
-              {overviewQuery.data?.supported_language_codes?.length ?? "—"}
+              {overview?.supported_language_codes?.length ?? "—"}
             </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
-            <p className="text-xs text-muted-foreground">Top preference language</p>
+            <p className="text-xs text-muted-foreground">Top preferred language</p>
             <p className="mt-2 text-2xl font-bold text-foreground">
-              {preferredLeader?.[0] ?? "—"}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {preferredLeader ? `${preferredLeader[1]} members` : "No preference data yet"}
+              {overview?.top_preferred_language ?? "—"}
             </p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
             <p className="text-xs text-muted-foreground">Top care-program language</p>
             <p className="mt-2 text-2xl font-bold text-foreground">
-              {carePlanLeader?.[0] ?? "—"}
+              {overview?.top_care_plan_language ?? "—"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {carePlanLeader ? `${carePlanLeader[1]} programs` : "No program data yet"}
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+            <p className="text-xs text-muted-foreground">Fallback usage count</p>
+            <p className="mt-2 text-3xl font-bold text-foreground">
+              {overview?.fallback_usage_count ?? "—"}
             </p>
           </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <section className="rounded-3xl border border-border bg-card p-5 shadow-card">
-            <div className="mb-4 flex items-center gap-2">
-              <Globe2 className="h-4 w-4 text-muted-foreground" />
-              <h2 className="font-heading text-xl font-semibold text-foreground">
-                Language mix
-              </h2>
+        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="space-y-6">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+              <div className="mb-4 flex items-center gap-2">
+                <Globe2 className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-heading text-xl font-semibold text-foreground">
+                  Language mix
+                </h2>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Member preference mix</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    What language members actively prefer for the product experience.
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.language_preference_breakdown ?? {}).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">{key}</span>
+                        <span className="text-sm font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Content language mix</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    The language currently chosen for content delivery.
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.content_language_breakdown ?? {}).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">{key}</span>
+                        <span className="text-sm font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Fallback language mix</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Backup language used when direct content is unavailable.
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.fallback_language_breakdown ?? {}).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">{key}</span>
+                        <span className="text-sm font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Care-program language mix</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Which languages recurring support programs are currently configured with.
+                  </p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.care_plan_language_breakdown ?? {}).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+                      >
+                        <span className="text-sm text-foreground">{key}</span>
+                        <span className="text-sm font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="text-sm font-semibold text-foreground">Member preference mix</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  What language members actively prefer for the product experience.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {Object.entries(overviewQuery.data?.language_preference_breakdown ?? {}).map(
-                    ([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
-                      >
-                        <span className="text-sm text-foreground">{key}</span>
-                        <span className="text-sm font-medium text-foreground">{value}</span>
-                      </div>
-                    ),
-                  )}
-                </div>
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+              <div className="mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-heading text-xl font-semibold text-foreground">
+                  Recent adoption
+                </h2>
               </div>
 
-              <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="text-sm font-semibold text-foreground">Content language mix</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  The language currently chosen for content delivery.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {Object.entries(overviewQuery.data?.content_language_breakdown ?? {}).map(
-                    ([key, value]) => (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Last 7 days</p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.recent_preference_adoption_7d ?? {}).map(([key, value]) => (
                       <div
                         key={key}
                         className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
@@ -157,19 +211,14 @@ export default function AdminLocalizationPage() {
                         <span className="text-sm text-foreground">{key}</span>
                         <span className="text-sm font-medium text-foreground">{value}</span>
                       </div>
-                    ),
-                  )}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="text-sm font-semibold text-foreground">Fallback language mix</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Backup language used when direct content is unavailable.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {Object.entries(overviewQuery.data?.fallback_language_breakdown ?? {}).map(
-                    ([key, value]) => (
+                <div className="rounded-2xl border border-border bg-background p-4">
+                  <p className="text-sm font-semibold text-foreground">Last 30 days</p>
+                  <div className="mt-4 space-y-2">
+                    {Object.entries(overview?.recent_preference_adoption_30d ?? {}).map(([key, value]) => (
                       <div
                         key={key}
                         className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
@@ -177,34 +226,49 @@ export default function AdminLocalizationPage() {
                         <span className="text-sm text-foreground">{key}</span>
                         <span className="text-sm font-medium text-foreground">{value}</span>
                       </div>
-                    ),
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-background p-4">
-                <p className="text-sm font-semibold text-foreground">Care-program language mix</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Which languages recurring support programs are currently configured with.
-                </p>
-                <div className="mt-4 space-y-2">
-                  {Object.entries(overviewQuery.data?.care_plan_language_breakdown ?? {}).map(
-                    ([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
-                      >
-                        <span className="text-sm text-foreground">{key}</span>
-                        <span className="text-sm font-medium text-foreground">{value}</span>
-                      </div>
-                    ),
-                  )}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
           <section className="space-y-6">
+            <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
+              <div className="mb-4 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-heading text-xl font-semibold text-foreground">
+                  Operational signals
+                </h2>
+              </div>
+
+              <div className="space-y-3">
+                {(overview?.alignment_alerts ?? []).map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-foreground"
+                  >
+                    {item}
+                  </div>
+                ))}
+
+                {(overview?.fallback_gap_alerts ?? []).map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground"
+                  >
+                    {item}
+                  </div>
+                ))}
+
+                {!(overview?.alignment_alerts?.length || overview?.fallback_gap_alerts?.length) ? (
+                  <div className="rounded-xl border border-dashed border-border bg-background p-4 text-sm text-muted-foreground">
+                    No operational alerts in the current view.
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
             <div className="rounded-3xl border border-border bg-card p-5 shadow-card">
               <div className="mb-4 flex items-center gap-2">
                 <MessageSquareText className="h-4 w-4 text-muted-foreground" />

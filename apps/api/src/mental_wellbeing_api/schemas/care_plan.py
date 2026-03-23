@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -25,11 +25,15 @@ class CarePlanCreateRequest(BaseModel):
 
 
 class CarePlanUpdateRequest(BaseModel):
+    title: str | None = None
+    description: str | None = None
     status: str | None = None
     current_step_key: str | None = None
     preferred_language: str | None = None
     timezone: str | None = None
     next_check_in_at: datetime | None = None
+    cadence_json: dict[str, Any] | None = None
+    sequence_json: dict[str, Any] | None = None
     metadata_json: dict[str, Any] | None = None
     progress_json: dict[str, Any] | None = None
     adherence_json: dict[str, Any] | None = None
@@ -95,6 +99,12 @@ class CarePlanAdvanceStepRequest(BaseModel):
     notes: str | None = None
 
 
+class CarePlanLifecycleRequest(BaseModel):
+    action: Literal["pause", "resume", "restart"]
+    notes: str | None = None
+    reset_history: bool = True
+
+
 class CarePlanUserSummaryResponse(BaseModel):
     user_id: str
     total_care_plans: int = 0
@@ -111,6 +121,9 @@ class AdminCarePlanOverviewResponse(BaseModel):
     completed_care_plans: int = 0
     paused_care_plans: int = 0
     overdue_check_ins: int = 0
+    at_risk_care_plans: int = 0
+    upcoming_check_ins_24h: int = 0
+    needs_attention_count: int = 0
     avg_adherence_score: float | None = None
     status_breakdown: dict[str, int] = Field(default_factory=dict)
     program_breakdown: dict[str, int] = Field(default_factory=dict)

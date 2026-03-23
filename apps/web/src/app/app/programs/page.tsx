@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
@@ -18,8 +19,8 @@ import {
   advanceCarePlan,
   createCarePlan,
   createCarePlanEvent,
+  lifecycleCarePlan,
   listCarePlans,
-  updateCarePlan,
 } from "@/lib/care-plans-api";
 import { getCurrentUserId } from "@/lib/demo-session";
 
@@ -53,6 +54,13 @@ function adherenceScore(value: unknown) {
   return typeof raw === "number" ? raw : null;
 }
 
+function getSteps(sequence: unknown) {
+  if (!sequence || typeof sequence !== "object") return [];
+  const steps = (sequence as { steps?: Array<Record<string, unknown>> }).steps;
+  if (!Array.isArray(steps)) return [];
+  return steps;
+}
+
 export default function ProgramsPage() {
   const userId = getCurrentUserId();
   const queryClient = useQueryClient();
@@ -77,9 +85,9 @@ export default function ProgramsPage() {
         cadence_json: { every_n_days: 3 },
         sequence_json: {
           steps: [
-            { key: "stabilize", order: 1 },
-            { key: "practice", order: 2 },
-            { key: "review", order: 3 },
+            { key: "stabilize", order: 1, title: "Settle in" },
+            { key: "practice", order: 2, title: "Practice gently" },
+            { key: "review", order: 3, title: "Review what is helping" },
           ],
         },
       }),
@@ -112,15 +120,36 @@ export default function ProgramsPage() {
     },
   });
 
-  const statusMutation = useMutation({
-    mutationFn: async ({ carePlanId, status }: { carePlanId: string; status: string }) =>
-      updateCarePlan(carePlanId, { status }),
+  const lifecycleMutation = useMutation({
+    mutationFn: async ({
+      carePlanId,
+      action,
+      resetHistory,
+      notes,
+    }: {
+      carePlanId: string;
+      action: "pause" | "resume" | "restart";
+      resetHistory?: boolean;
+      notes: string;
+    }) =>
+      lifecycleCarePlan(carePlanId, {
+        action,
+        reset_history: resetHistory ?? true,
+        notes,
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["care-plans", userId] });
     },
   });
 
   const carePlans = carePlansQuery.data ?? [];
+
+  const summary = useMemo(() => {
+    const active = carePlans.filter((item) => item.status === "active").length;
+    const paused = carePlans.filter((item) => item.status === "paused").length;
+    const completed = carePlans.filter((item) => item.status === "completed").length;
+    return { active, paused, completed };
+  }, [carePlans]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:px-8 md:py-10">
@@ -133,8 +162,8 @@ export default function ProgramsPage() {
             </div>
             <h1 className="font-heading text-3xl font-bold text-foreground">Support Programs</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              These are ongoing routines that help you stay supported over time. You can track
-              progress, check in, pause, resume, and continue from the next step.
+              These are ongoing routines that help you stay supported over time. You can
+              track progress, complete check-ins, pause when needed, and restart gently.
             </p>
           </div>
 
@@ -165,9 +194,29 @@ export default function ProgramsPage() {
                 No support program yet
               </h2>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Start one when you want gentle follow-through, recurring check-ins, and a clearer
-                sense of momentum.
+                Start one when you want gentle follow-through, recurring check-ins, and a
+                clearer sense of momentum.
               </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-border bg-background p-4 text-left">
+                  <p className="text-sm font-semibold text-foreground">1. Start small</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Begin with a routine that feels realistic.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-4 text-left">
+                  <p className="text-sm font-semibold text-foreground">2. Check in gently</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Build consistency without pressure.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border bg-background p-4 text-left">
+                  <p className="text-sm font-semibold text-foreground">3. Adjust as needed</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pause, resume, or restart when life shifts.
+                  </p>
+                </div>
+              </div>
               <Button
                 className="mt-6"
                 variant="hero"
@@ -179,155 +228,243 @@ export default function ProgramsPage() {
             </div>
           </div>
         ) : (
-          <div className="grid gap-5">
-            {carePlans.map((plan) => {
-              const progress = progressPercent(plan.progress_json);
-              const adherence = adherenceScore(plan.adherence_json);
-              const isPaused = plan.status === "paused";
-              const isCompleted = plan.status === "completed";
+          <>
+            <div className="mb-6 grid gap-4 md:grid-cols-4">
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <p className="text-xs text-muted-foreground">All programs</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{carePlans.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <p className="text-xs text-muted-foreground">Active</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{summary.active}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <p className="text-xs text-muted-foreground">Paused</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{summary.paused}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{summary.completed}</p>
+              </div>
+            </div>
 
-              return (
-                <section
-                  key={plan.id}
-                  className="rounded-3xl border border-border bg-card p-5 shadow-card"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="max-w-3xl">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-heading text-xl font-semibold text-foreground">
-                          {plan.title}
-                        </h2>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                            plan.status === "active"
-                              ? "bg-primary/10 text-primary"
+            <div className="grid gap-5">
+              {carePlans.map((plan) => {
+                const progress = progressPercent(plan.progress_json);
+                const adherence = adherenceScore(plan.adherence_json);
+                const isPaused = plan.status === "paused";
+                const isCompleted = plan.status === "completed";
+                const steps = getSteps(plan.sequence_json);
+                const currentIndex = steps.findIndex(
+                  (step) => step.key === plan.current_step_key,
+                );
+
+                return (
+                  <section
+                    key={plan.id}
+                    className="rounded-3xl border border-border bg-card p-5 shadow-card"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="max-w-3xl">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="font-heading text-xl font-semibold text-foreground">
+                            {plan.title}
+                          </h2>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                              plan.status === "active"
+                                ? "bg-primary/10 text-primary"
+                                : plan.status === "completed"
+                                  ? "bg-safe/15 text-safe"
+                                  : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {plan.status === "active"
+                              ? "Active"
                               : plan.status === "completed"
-                                ? "bg-safe/15 text-safe"
-                                : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {plan.status === "active"
-                            ? "Active"
-                            : plan.status === "completed"
-                              ? "Completed"
-                              : "Paused"}
-                        </span>
+                                ? "Completed"
+                                : "Paused"}
+                          </span>
+                        </div>
+
+                        {plan.description ? (
+                          <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+                        ) : null}
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-xl border border-border bg-background p-4">
+                            <p className="text-xs text-muted-foreground">Current step</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">
+                              {formatStepLabel(plan.current_step_key)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-background p-4">
+                            <p className="text-xs text-muted-foreground">Upcoming check-in</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">
+                              {formatDateTime(plan.next_check_in_at)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-border bg-background p-4">
+                            <p className="text-xs text-muted-foreground">Average adherence</p>
+                            <p className="mt-1 text-sm font-medium text-foreground">
+                              {adherence !== null ? `${Math.round(adherence * 100)}%` : "No check-ins yet"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {steps.length > 0 ? (
+                          <div className="mt-4">
+                            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Program path
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {steps.map((step, index) => {
+                                const state =
+                                  index < currentIndex
+                                    ? "done"
+                                    : index === currentIndex
+                                      ? "current"
+                                      : "next";
+                                const label =
+                                  typeof step.title === "string" && step.title
+                                    ? step.title
+                                    : formatStepLabel(
+                                        typeof step.key === "string" ? step.key : null,
+                                      );
+
+                                return (
+                                  <span
+                                    key={`${plan.id}-${String(step.key)}-${index}`}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                      state === "done"
+                                        ? "bg-safe/15 text-safe"
+                                        : state === "current"
+                                          ? "bg-primary/10 text-primary"
+                                          : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
-                      {plan.description ? (
-                        <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-                      ) : null}
+                      <div className="min-w-[280px] rounded-2xl border border-border bg-background p-4">
+                        <p className="text-xs text-muted-foreground">Progress</p>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-sm font-medium text-foreground">
+                          {progress.toFixed(0)}% complete
+                        </p>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl border border-border bg-background p-4">
-                          <p className="text-xs text-muted-foreground">Current step</p>
-                          <p className="mt-1 text-sm font-medium text-foreground">
-                            {formatStepLabel(plan.current_step_key)}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-background p-4">
-                          <p className="text-xs text-muted-foreground">Upcoming check-in</p>
-                          <p className="mt-1 text-sm font-medium text-foreground">
-                            {formatDateTime(plan.next_check_in_at)}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-background p-4">
-                          <p className="text-xs text-muted-foreground">Average adherence</p>
-                          <p className="mt-1 text-sm font-medium text-foreground">
-                            {adherence !== null ? `${Math.round(adherence * 100)}%` : "No check-ins yet"}
-                          </p>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          Choose the action that feels right today. You do not have to force the
+                          routine forward.
+                        </p>
+
+                        <div className="mt-4 flex flex-col gap-2">
+                          <Button
+                            variant="hero"
+                            onClick={() => markCheckInMutation.mutate(plan.id)}
+                            disabled={
+                              markCheckInMutation.isPending || isPaused || isCompleted || !userId
+                            }
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            Complete today’s check-in
+                          </Button>
+
+                          <Button
+                            variant="soft"
+                            onClick={() => advanceMutation.mutate(plan.id)}
+                            disabled={advanceMutation.isPending || isPaused || isCompleted}
+                          >
+                            <CalendarClock className="h-4 w-4" />
+                            I’m ready for the next step
+                          </Button>
+
+                          {isPaused ? (
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                lifecycleMutation.mutate({
+                                  carePlanId: plan.id,
+                                  action: "resume",
+                                  notes: "Resumed gently from the member experience.",
+                                })
+                              }
+                              disabled={lifecycleMutation.isPending}
+                            >
+                              <PlayCircle className="h-4 w-4" />
+                              Resume gently
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                lifecycleMutation.mutate({
+                                  carePlanId: plan.id,
+                                  action: "pause",
+                                  notes: "Paused from the member experience.",
+                                })
+                              }
+                              disabled={lifecycleMutation.isPending || isCompleted}
+                            >
+                              <PauseCircle className="h-4 w-4" />
+                              Pause for now
+                            </Button>
+                          )}
+
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  "Restart this support program from the first step and reset its progress?",
+                                )
+                              ) {
+                                lifecycleMutation.mutate({
+                                  carePlanId: plan.id,
+                                  action: "restart",
+                                  resetHistory: true,
+                                  notes: "Restarted from the member experience.",
+                                });
+                              }
+                            }}
+                            disabled={lifecycleMutation.isPending}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Restart from the beginning
+                          </Button>
                         </div>
                       </div>
                     </div>
-
-                    <div className="min-w-[260px] rounded-2xl border border-border bg-background p-4">
-                      <p className="text-xs text-muted-foreground">Progress</p>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary"
-                          style={{ width: `${Math.min(progress, 100)}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-sm font-medium text-foreground">
-                        {progress.toFixed(0)}% complete
-                      </p>
-
-                      <div className="mt-4 flex flex-col gap-2">
-                        <Button
-                          variant="hero"
-                          onClick={() => markCheckInMutation.mutate(plan.id)}
-                          disabled={
-                            markCheckInMutation.isPending || isPaused || isCompleted || !userId
-                          }
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                          Mark today’s check-in
-                        </Button>
-
-                        <Button
-                          variant="soft"
-                          onClick={() => advanceMutation.mutate(plan.id)}
-                          disabled={advanceMutation.isPending || isPaused || isCompleted}
-                        >
-                          <CalendarClock className="h-4 w-4" />
-                          Move to next step
-                        </Button>
-
-                        {isPaused ? (
-                          <Button
-                            variant="outline"
-                            onClick={() =>
-                              statusMutation.mutate({ carePlanId: plan.id, status: "active" })
-                            }
-                            disabled={statusMutation.isPending}
-                          >
-                            <PlayCircle className="h-4 w-4" />
-                            Resume program
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            onClick={() =>
-                              statusMutation.mutate({ carePlanId: plan.id, status: "paused" })
-                            }
-                            disabled={statusMutation.isPending || isCompleted}
-                          >
-                            <PauseCircle className="h-4 w-4" />
-                            Pause program
-                          </Button>
-                        )}
-
-                        <Button
-                          variant="ghost"
-                          onClick={() =>
-                            statusMutation.mutate({ carePlanId: plan.id, status: "active" })
-                          }
-                          disabled={statusMutation.isPending}
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                          Re-activate gently
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+                  </section>
+                );
+              })}
+            </div>
+          </>
         )}
 
         {(carePlansQuery.isError ||
           createProgramMutation.isError ||
           markCheckInMutation.isError ||
           advanceMutation.isError ||
-          statusMutation.isError) && (
+          lifecycleMutation.isError) && (
           <div className="mt-6 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
             {getApiErrorMessage(
               carePlansQuery.error ||
                 createProgramMutation.error ||
                 markCheckInMutation.error ||
                 advanceMutation.error ||
-                statusMutation.error,
+                lifecycleMutation.error,
             )}
           </div>
         )}

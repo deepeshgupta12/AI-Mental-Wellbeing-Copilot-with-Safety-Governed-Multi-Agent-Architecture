@@ -41,6 +41,12 @@ class CarePlanService:
         await self.session.refresh(row)
         return row
 
+    def _first_step_key(self, sequence_json: dict[str, Any] | None) -> str | None:
+        steps = (sequence_json or {}).get("steps") or []
+        if not steps:
+            return None
+        return steps[0].get("key")
+
     def _resolve_next_check_in_at(
         self,
         *,
@@ -51,6 +57,48 @@ class CarePlanService:
         every_n_days = int(cadence.get("every_n_days", 7))
         anchor = start_at or datetime.now(UTC)
         return anchor + timedelta(days=max(every_n_days, 1))
+
+    def _sync_schedule_contract(self, care_plan: CarePlan) -> dict[str, Any]:
+        return {
+            **(care_plan.schedule_contract_json or {}),
+            "orchestration": "care_plan_scheduler_v1",
+            "schedule_aware": True,
+            "next_check_in_at": care_plan.next_check_in_at.isoformat()
+            if care_plan.next_check_in_at
+            else None,
+        }
+
+    def _is_overdue(self, care_plan: CarePlan, now: datetime | None = None) -> bool:
+        effective_now = now or datetime.now(UTC)
+        return (
+            care_plan.status == "active"
+            and care_plan.next_check_in_at is not None
+            and care_plan.next_check_in_at < effective_now
+        )
+
+    def _is_at_risk(self, care_plan: CarePlan, now: datetime | None = None) -> bool:
+        effective_now = now or datetime.now(UTC)
+        adherence_json = care_plan.adherence_json or {}
+        avg_score = adherence_json.get("avg_score")
+        check_in_count = int(adherence_json.get("check_in_count") or 0)
+
+        if care_plan.status != "active":
+            return False
+
+        if self._is_overdue(care_plan, effective_now):
+            return True
+
+        if isinstance(avg_score, (int, float)) and float(avg_score) < 0.6:
+            return True
+
+        if (
+            check_in_count == 0
+            and care_plan.created_at is not None
+            and care_plan.created_at < effective_now - timedelta(days=7)
+        ):
+            return True
+
+        return False
 
     def _default_sequence(self, program_key: str, language: str) -> dict[str, Any]:
         title = self.localization.localize_text(
@@ -99,7 +147,7 @@ class CarePlanService:
             preferred_language,
         )
         steps = sequence_json.get("steps") or []
-        first_step_key = steps[0].get("key") if steps else None
+        first_step_key = self._first_step_key(sequence_json)
         next_check_in_at = self._resolve_next_check_in_at(
             start_at=start_at,
             cadence_json=cadence_json,
@@ -190,16 +238,51 @@ class CarePlanService:
         *,
         user_id: str | None = None,
         organization_id: str | None = None,
+        status: str | None = None,
+        preferred_language: str | None = None,
+        program_key: str | None = None,
+        attention_state: str | None = None,
         limit: int = 100,
     ) -> list[CarePlan]:
         await self.ensure_tables()
-        stmt = select(CarePlan).order_by(desc(CarePlan.updated_at)).limit(limit)
+
+        stmt = select(CarePlan)
+
         if user_id:
             stmt = stmt.where(CarePlan.user_id == user_id)
         if organization_id:
             stmt = stmt.where(CarePlan.organization_id == organization_id)
-        rows = await self.session.scalars(stmt)
-        return list(rows.all())
+        if status:
+            stmt = stmt.where(CarePlan.status == status)
+        if preferred_language:
+            stmt = stmt.where(
+                CarePlan.preferred_language
+                == self.localization.normalize_language(preferred_language)
+            )
+        if program_key:
+            stmt = stmt.where(CarePlan.program_key == program_key)
+
+        fetch_limit = 1000 if attention_state else limit
+        rows = await self.session.scalars(
+            stmt.order_by(desc(CarePlan.updated_at)).limit(fetch_limit)
+        )
+        items = list(rows.all())
+
+        if attention_state:
+            now = datetime.now(UTC)
+            if attention_state == "overdue":
+                items = [item for item in items if self._is_overdue(item, now)]
+            elif attention_state == "at_risk":
+                items = [item for item in items if self._is_at_risk(item, now)]
+            elif attention_state == "on_track":
+                items = [
+                    item
+                    for item in items
+                    if item.status == "active" and not self._is_at_risk(item, now)
+                ]
+            items = items[:limit]
+
+        return items
 
     async def update_care_plan(
         self,
@@ -212,8 +295,17 @@ class CarePlanService:
         if row is None:
             raise ValueError("Care plan not found")
 
+        cadence_changed = False
+        sequence_changed = False
+
+        if payload.get("title") is not None:
+            row.title = str(payload["title"])
+        if payload.get("description") is not None:
+            row.description = payload.get("description")
         if payload.get("status") is not None:
             row.status = str(payload["status"])
+            if row.status == "completed":
+                row.last_completed_at = datetime.now(UTC)
         if payload.get("current_step_key") is not None:
             row.current_step_key = str(payload["current_step_key"])
         if payload.get("preferred_language") is not None:
@@ -222,8 +314,19 @@ class CarePlanService:
             )
         if payload.get("timezone") is not None:
             row.timezone = payload["timezone"]
+        if payload.get("cadence_json") is not None:
+            row.cadence_json = payload["cadence_json"]
+            cadence_changed = True
+        if payload.get("sequence_json") is not None:
+            row.sequence_json = payload["sequence_json"]
+            sequence_changed = True
         if payload.get("next_check_in_at") is not None:
             row.next_check_in_at = payload["next_check_in_at"]
+        elif cadence_changed:
+            row.next_check_in_at = self._resolve_next_check_in_at(
+                start_at=datetime.now(UTC),
+                cadence_json=row.cadence_json,
+            )
         if payload.get("metadata_json") is not None:
             row.metadata_json = payload["metadata_json"]
         if payload.get("progress_json") is not None:
@@ -231,8 +334,89 @@ class CarePlanService:
         if payload.get("adherence_json") is not None:
             row.adherence_json = payload["adherence_json"]
 
+        if sequence_changed:
+            first_step_key = self._first_step_key(row.sequence_json)
+            step_keys = {
+                item.get("key")
+                for item in ((row.sequence_json or {}).get("steps") or [])
+                if item.get("key")
+            }
+            if row.current_step_key not in step_keys:
+                row.current_step_key = first_step_key
+
+            if row.progress_json is not None:
+                row.progress_json = {
+                    **row.progress_json,
+                    "total_step_count": len((row.sequence_json or {}).get("steps") or []),
+                }
+
+        row.schedule_contract_json = self._sync_schedule_contract(row)
+
         await self.session.commit()
         return await self._reload_care_plan(care_plan_id)
+
+    async def transition_lifecycle(
+        self,
+        *,
+        care_plan_id: str,
+        action: str,
+        notes: str | None,
+        reset_history: bool = True,
+    ) -> CarePlan:
+        care_plan = await self.get_care_plan(care_plan_id)
+        if care_plan is None:
+            raise ValueError("Care plan not found")
+
+        if action == "pause":
+            care_plan.status = "paused"
+        elif action == "resume":
+            care_plan.status = "active"
+            care_plan.next_check_in_at = self._resolve_next_check_in_at(
+                start_at=datetime.now(UTC),
+                cadence_json=care_plan.cadence_json,
+            )
+        elif action == "restart":
+            care_plan.status = "active"
+            care_plan.current_step_key = self._first_step_key(care_plan.sequence_json)
+            care_plan.last_completed_at = None
+            care_plan.next_check_in_at = self._resolve_next_check_in_at(
+                start_at=datetime.now(UTC),
+                cadence_json=care_plan.cadence_json,
+            )
+            care_plan.progress_json = {
+                "completed_step_count": 0,
+                "total_step_count": len((care_plan.sequence_json or {}).get("steps") or []),
+                "completion_pct": 0.0,
+            }
+            if reset_history:
+                care_plan.adherence_json = {
+                    "latest_score": None,
+                    "avg_score": None,
+                    "check_in_count": 0,
+                }
+        else:
+            raise ValueError("Unsupported lifecycle action")
+
+        care_plan.schedule_contract_json = self._sync_schedule_contract(care_plan)
+
+        await self.session.commit()
+        await self.session.refresh(care_plan)
+
+        await self.record_event(
+            care_plan_id=care_plan.id,
+            user_id=care_plan.user_id,
+            event_type=f"program_{action}",
+            event_status=care_plan.status,
+            step_key=care_plan.current_step_key,
+            adherence_score=None,
+            notes=notes or f"Program {action} requested.",
+            event_payload_json={
+                "action": action,
+                "reset_history": reset_history,
+            },
+        )
+
+        return await self._reload_care_plan(care_plan.id)
 
     async def record_event(
         self,
@@ -336,14 +520,7 @@ class CarePlanService:
             start_at=datetime.now(UTC),
             cadence_json=care_plan.cadence_json,
         )
-        care_plan.schedule_contract_json = {
-            **(care_plan.schedule_contract_json or {}),
-            "orchestration": "care_plan_scheduler_v1",
-            "schedule_aware": True,
-            "next_check_in_at": care_plan.next_check_in_at.isoformat()
-            if care_plan.next_check_in_at
-            else None,
-        }
+        care_plan.schedule_contract_json = self._sync_schedule_contract(care_plan)
 
         await self.session.commit()
         await self.session.refresh(care_plan)
@@ -398,6 +575,7 @@ class CarePlanService:
             "avg_score": round(mean(adherence_scores), 2) if adherence_scores else None,
             "check_in_count": len(adherence_scores),
         }
+        care_plan.schedule_contract_json = self._sync_schedule_contract(care_plan)
 
         await self.session.commit()
         await self.session.refresh(care_plan)
@@ -415,7 +593,9 @@ class CarePlanService:
             "user_id": user_id,
             "total_care_plans": len(items),
             "active_care_plans": len([item for item in items if item.status == "active"]),
-            "completed_care_plans": len([item for item in items if item.status == "completed"]),
+            "completed_care_plans": len(
+                [item for item in items if item.status == "completed"]
+            ),
             "avg_adherence_score": round(mean(adherence_scores), 2)
             if adherence_scores
             else None,
@@ -447,13 +627,24 @@ class CarePlanService:
             if (item.adherence_json or {}).get("avg_score") is not None
         ]
         now = datetime.now(UTC)
-        overdue = len(
+        overdue = len([item for item in items if self._is_overdue(item, now)])
+        at_risk = len([item for item in items if self._is_at_risk(item, now)])
+        upcoming_24h = len(
             [
                 item
                 for item in items
                 if item.status == "active"
                 and item.next_check_in_at is not None
-                and item.next_check_in_at < now
+                and now <= item.next_check_in_at <= now + timedelta(hours=24)
+            ]
+        )
+        needs_attention = len(
+            [
+                item
+                for item in items
+                if self._is_overdue(item, now)
+                or self._is_at_risk(item, now)
+                or item.status == "paused"
             ]
         )
 
@@ -469,6 +660,9 @@ class CarePlanService:
                     "completed_care_plans": 0,
                     "paused_care_plans": 0,
                     "overdue_check_ins": 0,
+                    "at_risk_care_plans": 0,
+                    "upcoming_check_ins_24h": 0,
+                    "needs_attention_count": 0,
                     "avg_adherence_score": None,
                     "status_breakdown": {},
                     "program_breakdown": {},
@@ -484,6 +678,9 @@ class CarePlanService:
             "completed_care_plans": status_counter.get("completed", 0),
             "paused_care_plans": status_counter.get("paused", 0),
             "overdue_check_ins": overdue,
+            "at_risk_care_plans": at_risk,
+            "upcoming_check_ins_24h": upcoming_24h,
+            "needs_attention_count": needs_attention,
             "avg_adherence_score": round(mean(adherence_scores), 2)
             if adherence_scores
             else None,

@@ -17,7 +17,15 @@ export type CarePlan = {
   next_check_in_at: string | null;
   last_completed_at: string | null;
   cadence_json: Record<string, unknown> | null;
-  sequence_json: Record<string, unknown> | null;
+  sequence_json: {
+    steps?: Array<{
+      key?: string;
+      order?: number;
+      title?: string;
+      goal?: string;
+    }>;
+    [key: string]: unknown;
+  } | null;
   progress_json: {
     completed_step_count?: number;
     total_step_count?: number;
@@ -52,11 +60,15 @@ export type CarePlanCreatePayload = {
 };
 
 export type CarePlanUpdatePayload = {
+  title?: string | null;
+  description?: string | null;
   status?: string | null;
   current_step_key?: string | null;
   preferred_language?: string | null;
   timezone?: string | null;
   next_check_in_at?: string | null;
+  cadence_json?: Record<string, unknown> | null;
+  sequence_json?: Record<string, unknown> | null;
   metadata_json?: Record<string, unknown> | null;
   progress_json?: Record<string, unknown> | null;
   adherence_json?: Record<string, unknown> | null;
@@ -90,6 +102,12 @@ export type CarePlanAdvancePayload = {
   notes?: string | null;
 };
 
+export type CarePlanLifecyclePayload = {
+  action: "pause" | "resume" | "restart";
+  notes?: string | null;
+  reset_history?: boolean;
+};
+
 export type CarePlanSummary = {
   user_id: string;
   total_care_plans: number;
@@ -106,6 +124,9 @@ export type AdminCarePlanOverview = {
   completed_care_plans: number;
   paused_care_plans: number;
   overdue_check_ins: number;
+  at_risk_care_plans: number;
+  upcoming_check_ins_24h: number;
+  needs_attention_count: number;
   avg_adherence_score: number | null;
   status_breakdown: Record<string, number>;
   program_breakdown: Record<string, number>;
