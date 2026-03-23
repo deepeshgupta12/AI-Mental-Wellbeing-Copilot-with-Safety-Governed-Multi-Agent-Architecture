@@ -7,6 +7,8 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mental_wellbeing_api.api.deps import db_session_dep, require_permission
+from mental_wellbeing_api.models.care_plan import CarePlan
+from mental_wellbeing_api.models.care_plan_event import CarePlanEvent
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.models.follow_up_event import FollowUpEvent
 from mental_wellbeing_api.models.follow_up_plan import FollowUpPlan
@@ -46,8 +48,16 @@ from mental_wellbeing_api.schemas.admin import (
     AdminTraceItemResponse,
     AdminTrendOverviewResponse,
 )
+from mental_wellbeing_api.schemas.care_plan import (
+    AdminCarePlanOverviewResponse,
+    CarePlanEventResponse,
+    CarePlanResponse,
+)
+from mental_wellbeing_api.schemas.localization import AdminLocalizationOverviewResponse
 from mental_wellbeing_api.services.admin_observability_service import AdminObservabilityService
+from mental_wellbeing_api.services.care_plan_service import CarePlanService
 from mental_wellbeing_api.services.config_registry_service import ConfigRegistryService
+from mental_wellbeing_api.services.localization_service import LocalizationService
 from mental_wellbeing_api.services.safety_review_service import SafetyReviewService
 from mental_wellbeing_api.services.trend_intelligence_service import TrendIntelligenceService
 
@@ -445,6 +455,55 @@ async def get_follow_up_events(
     return list(result.all())
 
 
+@router.get("/care-plans/overview", response_model=AdminCarePlanOverviewResponse)
+async def get_care_plan_overview(
+    organization_id: str | None = Query(default=None),
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminCarePlanOverviewResponse:
+    service = CarePlanService(session)
+    payload = await service.build_admin_overview(organization_id=organization_id)
+    return AdminCarePlanOverviewResponse(**payload)
+
+
+@router.get("/care-plans", response_model=list[CarePlanResponse])
+async def get_admin_care_plans(
+    organization_id: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[CarePlanResponse]:
+    service = CarePlanService(session)
+    return await service.list_care_plans(organization_id=organization_id, limit=limit)
+
+
+@router.get("/care-plan-events", response_model=list[CarePlanEventResponse])
+async def get_admin_care_plan_events(
+    care_plan_id: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    session: AsyncSession = Depends(db_session_dep),
+) -> list[CarePlanEventResponse]:
+    if care_plan_id:
+        service = CarePlanService(session)
+        return await service.list_events(care_plan_id=care_plan_id, limit=limit)
+
+    rows = await session.scalars(
+        select(CarePlanEvent)
+        .order_by(desc(CarePlanEvent.created_at))
+        .limit(limit)
+    )
+    return list(rows.all())
+
+
+@router.get("/localization/overview", response_model=AdminLocalizationOverviewResponse)
+async def get_admin_localization_overview(
+    organization_id: str | None = Query(default=None),
+    session: AsyncSession = Depends(db_session_dep),
+) -> AdminLocalizationOverviewResponse:
+    service = LocalizationService(session)
+    return AdminLocalizationOverviewResponse(
+        **(await service.build_admin_overview(organization_id=organization_id))
+    )
+
+
 @router.get("/agent-traces", response_model=list[AdminTraceItemResponse])
 async def get_agent_traces(
     limit: int = 100,
@@ -648,11 +707,6 @@ async def get_analytics_overview(
     service = AdminObservabilityService(session)
     payload = await service.get_analytics_overview()
     return AdminAnalyticsOverviewResponse(**payload)
-
-
-# ---------------------------
-# V3 reviewer / safety queue
-# ---------------------------
 
 
 @router.get("/safety-events", response_model=list[AdminSafetyEventResponse])

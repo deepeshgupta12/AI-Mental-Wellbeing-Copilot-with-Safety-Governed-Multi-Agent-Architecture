@@ -366,7 +366,6 @@ class AdminAuditLogResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-
 class AdminOrganizationSummaryResponse(BaseModel):
     id: str
     name: str

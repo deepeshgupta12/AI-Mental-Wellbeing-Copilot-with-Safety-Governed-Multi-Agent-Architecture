@@ -14,6 +14,14 @@ def run_execution_finalize_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     scheduler_backend = state.get("scheduler_backend")
     follow_up_plan_created = bool(state.get("follow_up_plan_id"))
     follow_up_contract_available = bool(state.get("follow_up_contract"))
+    care_plan_required = bool(state.get("care_plan_required", False))
+    care_program_key = state.get("care_program_key")
+    language = (
+        state.get("preferred_language")
+        or state.get("content_language")
+        or state.get("preference_signals", {}).get("preferred_language")
+        or "en"
+    )
 
     summary = (
         f"Executed {len(execution_path)} nodes with "
@@ -32,6 +40,9 @@ def run_execution_finalize_agent(state: AgentRuntimeState) -> AgentRuntimeState:
     summary += (
         f" Follow-up contract available: {'yes' if follow_up_contract_available else 'no'}."
     )
+    summary += f" Care plan required: {'yes' if care_plan_required else 'no'}."
+    summary += f" Care program key: {care_program_key or 'none'}."
+    summary += f" Language: {language}."
 
     state = append_execution_event(
         state,
@@ -45,6 +56,9 @@ def run_execution_finalize_agent(state: AgentRuntimeState) -> AgentRuntimeState:
             "scheduler_backend": scheduler_backend,
             "follow_up_plan_created": follow_up_plan_created,
             "follow_up_contract_available": follow_up_contract_available,
+            "care_plan_required": care_plan_required,
+            "care_program_key": care_program_key,
+            "language": language,
         },
     )
 

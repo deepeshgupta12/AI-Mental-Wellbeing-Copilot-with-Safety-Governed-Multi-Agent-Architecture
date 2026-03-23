@@ -70,6 +70,10 @@ class AgentRuntimeState(TypedDict, total=False):
     temporal_contract: dict[str, Any]
     scheduler_backend: str | None
 
+    care_plan_required: bool
+    care_program_key: str | None
+    care_plan_language: str | None
+
     risk_level: str
     safety_flag_type: str
     safety_summary: str
@@ -87,3 +91,8 @@ class AgentRuntimeState(TypedDict, total=False):
     review_recommended: bool
     alertable_safety_trace: bool
     safety_temporal_contract: dict[str, Any]
+
+    preferred_language: str | None
+    content_language: str | None
+    fallback_language: str | None
+    localized_runtime_copy: dict[str, Any]

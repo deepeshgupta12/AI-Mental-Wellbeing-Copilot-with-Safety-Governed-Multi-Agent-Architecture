@@ -4,6 +4,8 @@ from mental_wellbeing_api.models.admin_config_version import AdminConfigVersion
 from mental_wellbeing_api.models.agent_trace import AgentTrace
 from mental_wellbeing_api.models.audit_log import AuditLog
 from mental_wellbeing_api.models.auth_session import AuthSession
+from mental_wellbeing_api.models.care_plan import CarePlan
+from mental_wellbeing_api.models.care_plan_event import CarePlanEvent
 from mental_wellbeing_api.models.check_in import CheckIn
 from mental_wellbeing_api.models.conversation import ConversationMessage, ConversationSession
 from mental_wellbeing_api.models.enterprise_setting import EnterpriseSetting
@@ -34,6 +36,8 @@ __all__ = [
     "AgentTrace",
     "AuditLog",
     "AuthSession",
+    "CarePlan",
+    "CarePlanEvent",
     "CheckIn",
     "ConversationMessage",
     "ConversationSession",

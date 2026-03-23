@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Literal
 from uuid import UUID
 
+from mental_wellbeing_api.schemas.care_plan import CarePlanResponse
 from pydantic import BaseModel, Field
 
 from mental_wellbeing_api.schemas.follow_up import FollowUpPlanResponse
@@ -103,6 +104,17 @@ class AgentRuntimeSmokeResponse(BaseModel):
     scheduler_backend: str | None = None
 
     generated_follow_up_plan: FollowUpPlanResponse | None = None
+
+    care_plan_required: bool = False
+    care_plan: dict[str, Any] = Field(default_factory=dict)
+    care_plan_id: str | None = None
+    generated_care_plan: CarePlanResponse | None = None
+
+    preferred_language: str | None = None
+    content_language: str | None = None
+    fallback_language: str | None = None
+    localized_runtime_copy: dict[str, Any] = Field(default_factory=dict)
+
     memory_hits: list[RecalledMemoryItemResponse] = Field(default_factory=list)
 
     execution_path: list[str] = Field(default_factory=list)

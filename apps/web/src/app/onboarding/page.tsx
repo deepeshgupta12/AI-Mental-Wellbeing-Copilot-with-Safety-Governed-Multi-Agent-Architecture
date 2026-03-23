@@ -1,4 +1,3 @@
-// apps/web/src/app/onboarding/page.tsx
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
@@ -11,6 +10,7 @@ import {
   Cloud,
   Feather,
   Flame,
+  Globe2,
   Heart,
   ListChecks,
   Moon,
@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/api-client";
 import { setCurrentUserSession } from "@/lib/demo-session";
+import { updateUserLanguagePreference } from "@/lib/localization-api";
 import { createUser } from "@/lib/users-api";
 
 type SelectionValue = string | string[];
@@ -33,7 +34,7 @@ type StepOption = {
 };
 
 type ChoiceStep = {
-  id: "intent" | "style" | "focus";
+  id: "intent" | "style" | "focus" | "language";
   title: string;
   subtitle: string;
   options: readonly StepOption[];
@@ -122,6 +123,31 @@ const steps: readonly OnboardingStep[] = [
     ],
   },
   {
+    id: "language",
+    title: "Which language should Aether use?",
+    subtitle: "This will shape the UI and localized support wording.",
+    options: [
+      {
+        id: "en",
+        label: "English",
+        icon: Globe2,
+        desc: "Default English UI and support copy.",
+      },
+      {
+        id: "hi",
+        label: "Hindi",
+        icon: Globe2,
+        desc: "हिन्दी UI and localized support wording.",
+      },
+      {
+        id: "hinglish",
+        label: "Hinglish",
+        icon: Globe2,
+        desc: "A mixed English + Hindi conversational style.",
+      },
+    ],
+  },
+  {
     id: "boundaries",
     title: "What Aether is — and isn't.",
     subtitle: "",
@@ -165,7 +191,16 @@ export default function OnboardingPage() {
 
   const createUserMutation = useMutation({
     mutationFn: createUser,
-    onSuccess: (user) => {
+    onSuccess: async (user) => {
+      const language =
+        typeof selections.language === "string" ? selections.language : "en";
+
+      await updateUserLanguagePreference(user.id, {
+        preferred_language: language,
+        content_language: language,
+        fallback_language: "en",
+      });
+
       setCurrentUserSession({
         userId: user.id,
         email: user.email,
@@ -243,7 +278,7 @@ export default function OnboardingPage() {
                   <div className="rounded-lg border border-border bg-card p-5 shadow-card">
                     <p className="mb-3 text-sm leading-relaxed text-foreground">
                       <strong>Aether is</strong> a wellbeing companion for self-reflection, coping
-                      guidance, habit support, and trend awareness.
+                      guidance, habit support, care programs, and trend awareness.
                     </p>
                     <p className="mb-3 text-sm leading-relaxed text-foreground">
                       <strong>Aether is not</strong> a therapist, a clinical diagnostic tool, or an
@@ -313,10 +348,10 @@ export default function OnboardingPage() {
                 {createUserMutation.isPending
                   ? "Creating your space..."
                   : isBoundaryStep(step)
-                    ? "I understand"
-                    : currentStep === steps.length - 1
-                      ? "Begin"
-                      : "Continue"}
+                  ? "I understand"
+                  : currentStep === steps.length - 1
+                  ? "Begin"
+                  : "Continue"}
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </motion.div>
