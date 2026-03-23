@@ -13,6 +13,12 @@ export type LocalizationCatalog = {
   localized_ui_sections: string[];
 };
 
+export type LocalizationRuntimeCopy = {
+  language: string;
+  normalized_language: string;
+  copy: Record<string, string>;
+};
+
 export type UserLanguagePreference = {
   user_id: string;
   preferred_language: string;
@@ -21,15 +27,18 @@ export type UserLanguagePreference = {
   supported_languages: string[];
 };
 
-export type LocalizationRuntimeCopy = {
-  language: string;
-  normalized_language: string;
-  copy: Record<string, unknown>;
+export type UpdateUserLanguagePreferencePayload = {
+  preferred_language: string;
+  content_language?: string | null;
+  fallback_language?: string | null;
 };
 
 export type AdminLocalizationOverview = {
+  organization_id?: string | null;
   default_language: string;
-  supported_languages: string[];
-  user_language_breakdown: Record<string, number>;
+  supported_language_codes: string[];
+  language_preference_breakdown: Record<string, number>;
+  content_language_breakdown: Record<string, number>;
+  fallback_language_breakdown: Record<string, number>;
   care_plan_language_breakdown: Record<string, number>;
 };

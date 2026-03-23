@@ -3,6 +3,7 @@ import type {
   AdminLocalizationOverview,
   LocalizationCatalog,
   LocalizationRuntimeCopy,
+  UpdateUserLanguagePreferencePayload,
   UserLanguagePreference,
 } from "@/types/localization";
 
@@ -11,8 +12,8 @@ export function getLocalizationCatalog(): Promise<LocalizationCatalog> {
 }
 
 export function getLocalizationRuntimeCopy(language?: string | null): Promise<LocalizationRuntimeCopy> {
-  const query = language ? `?language=${encodeURIComponent(language)}` : "";
-  return apiRequest<LocalizationRuntimeCopy>(`/api/v1/localization/runtime-copy${query}`);
+  const suffix = language ? `?language=${encodeURIComponent(language)}` : "";
+  return apiRequest<LocalizationRuntimeCopy>(`/api/v1/localization/runtime-copy${suffix}`);
 }
 
 export function getUserLanguagePreference(userId: string): Promise<UserLanguagePreference> {
@@ -21,11 +22,7 @@ export function getUserLanguagePreference(userId: string): Promise<UserLanguageP
 
 export function updateUserLanguagePreference(
   userId: string,
-  payload: {
-    preferred_language: string;
-    content_language?: string | null;
-    fallback_language?: string | null;
-  },
+  payload: UpdateUserLanguagePreferencePayload,
 ): Promise<UserLanguagePreference> {
   return apiRequest<UserLanguagePreference>(`/api/v1/users/${userId}/language`, {
     method: "PUT",
@@ -36,6 +33,6 @@ export function updateUserLanguagePreference(
 export function getAdminLocalizationOverview(
   organizationId?: string | null,
 ): Promise<AdminLocalizationOverview> {
-  const query = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
-  return apiRequest<AdminLocalizationOverview>(`/api/v1/admin/localization/overview${query}`);
+  const suffix = organizationId ? `?organization_id=${encodeURIComponent(organizationId)}` : "";
+  return apiRequest<AdminLocalizationOverview>(`/api/v1/admin/localization/overview${suffix}`);
 }
